@@ -1,6 +1,6 @@
-# MobileNet-SSD and MobileNetV2-SSD/SSDLite with PyTorch
+# UBI_SSD with PyTorch
 
-Object Detection with MobileNet-SSD, MobileNetV2-SSD/SSDLite on VOC, BDD100K Datasets.
+Object Detection with SSD on UBI Datasets.
 
 <!-- ## Results
 1. Detection
@@ -11,9 +11,18 @@ Object Detection with MobileNet-SSD, MobileNetV2-SSD/SSDLite on VOC, BDD100K Dat
 ## Dependencies
 - Python 3.8
 - OpenCV
-- PyTorch
+- numpy
+- PyTorch 1.10
+- tensonflow 2.2.0
 - tensorboard
 - tqdm
+- rknntoolkit 1.7.3
+
+## Optional Model
+- Vgg16-SSD
+- MobileNet_V1-SSD
+- MobileNet_V1-SSDLite
+- MobileNet_V2-SSDLite
 
 ## Usage
 1. Get dataset
