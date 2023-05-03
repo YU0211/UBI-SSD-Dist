@@ -26,7 +26,7 @@ class UBI_Dataset:
 		self.image_sets_file = os.path.join(self.datapath, f'{dataset_type}.txt')
 		
   
-		self.ids = VOCDataset._read_image_ids(self.image_sets_file)
+		self.ids = UBI_Dataset._read_image_ids(self.image_sets_file)
 		self.keep_difficult = keep_difficult
 
 		# if the labels file exists, read in the class names

@@ -1,39 +1,27 @@
 import numpy as np
-
-import re
-import math
-import random
+import os
+import time
 import cv2
 
 from rknn.api import RKNN
 
 
+# PT_MODEL = '/root/ubi/UBI_Dataset/mobilenets-ssd-pytorch/models/best.torchscript_optim.pt'
 PT_MODEL = '/root/ubi/UBI_Dataset/mobilenets-ssd-pytorch/models/best.torchscript.pt'
 RKNN_MODEL = 'MobilenetV2_SSD_Lite.rknn'
 IMG_PATH = 'test.jpg'
 DATASET = 'dataset.txt'
 
+ORIG_IMG_SIZE = (1920, 1080)
+INPUT_IMG_SIZE = (300, 300)
+CLASSES = ['BACKGROUND', 'vehicle', 'rider', 'pedestrian']
 QUANTIZE_ON = True
 
-BOX_THRESH = 0.5
-NMS_THRESH = 0.6
-IMG_SIZE = (300, 300) # (width, height), such as (1280, 736)
 
-NUM_RESULTS = 1917
-NUM_CLASSES = 3
-
-Y_SCALE = 10.0
-X_SCALE = 10.0
-H_SCALE = 5.0
-W_SCALE = 5.0
-
-
-def expit(x):
-    return 1. / (1. + math.exp(-x))
-
-
-def unexpit(y):
-    return -1.0 * math.log((1.0 / y) - 1.0);
+PROB_THRESH = 0.2
+IOU_THRESH = 0.45
+TOP_K = 10
+CANDIDATE_SIZE = 200
 
 
 def CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
@@ -47,37 +35,84 @@ def CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
 
     return i / u
 
+def area_of(left_top, right_bottom):
+    overlap_wh = np.clip(right_bottom - left_top, 0.0, None)
+    return overlap_wh[:, 0] * overlap_wh[:, 1]
 
-def load_box_priors():
-    box_priors_ = []
-    fp = open('./box_priors.txt', 'r')
-    ls = fp.readlines()
-    for s in ls:
-        aList = re.findall('([-+]?\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', s)
-        for ss in aList:
-            aNum = float((ss[0]+ss[2]))
-            box_priors_.append(aNum)
-    fp.close()
+def cal_iou(bbox, gt, eps=1e-5):
+    left_top = np.maximum(bbox[:, :2],gt[:, :2])
+    right_bottom = np.minimum(bbox[:, 2:4],gt[:, 2:4])
+    overlap_area = area_of(left_top, right_bottom)
 
-    box_priors = np.array(box_priors_)
-    box_priors = box_priors.reshape(4, NUM_RESULTS)
+    bbox_area = area_of(bbox[:, :2], bbox[:, 2:])
+    gt_area = area_of(gt[:, :2], gt[:, 2:])
+    return overlap_area / (bbox_area + gt_area - overlap_area + eps)
 
-    return box_priors
 
+def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
+    scores = box_scores[:, -1]
+    boxes = box_scores[:, :-1]
+    picked = []
+    indexes = np.argsort(-scores)[:candidate_size]
+    while len(indexes) > 0:
+        current = indexes[0]
+        picked.append(current.item())
+        if 0 < top_k == len(picked) or len(indexes) == 1:
+            break
+        current_box = boxes[current, :]
+        indexes = indexes[1:]
+        rest_boxes = boxes[indexes, :]
+        iou = cal_iou(
+            rest_boxes,
+            np.expand_dims(current_box, axis=0),
+        )
+        indexes = indexes[iou <= iou_threshold]
+
+    return box_scores[picked, :]
+
+def postprocessing(boxes, scores):
+    picked_box_probs = []
+    picked_labels = []
+    for class_index in range(1, scores.shape[1]):
+        probs = scores[:, class_index]
+        mask = probs > PROB_THRESH
+        probs = probs[mask]
+        if probs.shape[0] == 0:
+            continue
+        subset_boxes = boxes[mask, :]
+        box_probs = np.concatenate([subset_boxes, probs.reshape(-1, 1)], axis=1)
+        box_probs = hard_nms(box_probs,
+                             iou_threshold = IOU_THRESH,
+                             top_k = TOP_K,
+                             candidate_size = CANDIDATE_SIZE)
+        picked_box_probs.append(box_probs)
+        picked_labels.extend([class_index] * box_probs.shape[0])
+    if not picked_box_probs:
+        raise(f"Didn't catch the specified object: ${CLASSES}")
+    picked_box_probs = np.asarray(picked_box_probs)
+    picked_box_probs = np.concatenate(picked_box_probs, axis=0)
+    picked_box_probs[:, 0] *= ORIG_IMG_SIZE[0]
+    picked_box_probs[:, 1] *= ORIG_IMG_SIZE[1]
+    picked_box_probs[:, 2] *= ORIG_IMG_SIZE[0]
+    picked_box_probs[:, 3] *= ORIG_IMG_SIZE[1]
+    return picked_box_probs[:, :4], picked_labels, picked_box_probs[:, 4]
 
 if __name__ == '__main__':
 
     # Create RKNN object
     rknn = RKNN()
-
     # Config for Model Input PreProcess
     print('--> Config model')
-    rknn.config(mean_values=[[127.5, 127.5, 127.5]], std_values=[[127.5, 127.5, 127.5]], reorder_channel='0 1 2')
+    rknn.config(
+        target_platform='rv1126',
+        mean_values=[[127.5, 127.5, 127.5]],
+        std_values=[[127.5, 127.5, 127.5]],
+        reorder_channel='0 1 2')
     print('done')
 
     # Load TensorFlow Model
     print('--> Loading model')
-    ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[[3,IMG_SIZE[1], IMG_SIZE[0]]])
+    ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[[3,INPUT_IMG_SIZE[1], INPUT_IMG_SIZE[0]]])
     if ret != 0:
         print('Load model failed!')
         exit(ret)
@@ -85,7 +120,7 @@ if __name__ == '__main__':
 
     # Build Model
     print('--> Building model')
-    ret = rknn.build(do_quantization=True, dataset='./dataset.txt')
+    ret = rknn.build(do_quantization=QUANTIZE_ON, dataset=DATASET)
     if ret != 0:
         print('Build model failed!')
         exit(ret)
@@ -105,7 +140,7 @@ if __name__ == '__main__':
     # Set inputs
     orig_img = cv2.imread(IMG_PATH)
     img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, IMG_SIZE, interpolation=cv2.INTER_CUBIC)
+    img = cv2.resize(img, INPUT_IMG_SIZE, interpolation=cv2.INTER_CUBIC)
 
     # init runtime environment
     print('--> Init runtime environment')
@@ -120,95 +155,27 @@ if __name__ == '__main__':
     outputs = rknn.inference(inputs=[img])
     print('done')
 
-    predictions = outputs[0].reshape((1, NUM_RESULTS, 4))
-    outputClasses = outputs[1].reshape((1, NUM_RESULTS, NUM_CLASSES))
-    candidateBox = np.zeros([2, NUM_RESULTS], dtype=int)
-    vaildCnt = 0
-
-    box_priors = load_box_priors()
-
-    # Post Process
-    # got valid candidate box
-    for i in range(0, NUM_RESULTS):
-        topClassScore = -1000
-        topClassScoreIndex = -1
-
-        # Skip the first catch-all class.
-        for j in range(1, NUM_CLASSES):
-            score = expit(outputClasses[0][i][j]);
-
-            if score > topClassScore:
-                topClassScoreIndex = j
-                topClassScore = score
-
-        if topClassScore > 0.4:
-            candidateBox[0][vaildCnt] = i
-            candidateBox[1][vaildCnt] = topClassScoreIndex
-            vaildCnt += 1
-
-    # calc position
-    for i in range(0, vaildCnt):
-        if candidateBox[0][i] == -1:
-            continue
-
-        n = candidateBox[0][i]
-        ycenter = predictions[0][n][0] / Y_SCALE * box_priors[2][n] + box_priors[0][n]
-        xcenter = predictions[0][n][1] / X_SCALE * box_priors[3][n] + box_priors[1][n]
-        h = math.exp(predictions[0][n][2] / H_SCALE) * box_priors[2][n]
-        w = math.exp(predictions[0][n][3] / W_SCALE) * box_priors[3][n]
-
-        ymin = ycenter - h / 2.
-        xmin = xcenter - w / 2.
-        ymax = ycenter + h / 2.
-        xmax = xcenter + w / 2.
-
-        predictions[0][n][0] = ymin
-        predictions[0][n][1] = xmin
-        predictions[0][n][2] = ymax
-        predictions[0][n][3] = xmax
- 
-    # NMS
-    for i in range(0, vaildCnt):
-        if candidateBox[0][i] == -1:
-            continue
-
-        n = candidateBox[0][i]
-        xmin0 = predictions[0][n][1]
-        ymin0 = predictions[0][n][0]
-        xmax0 = predictions[0][n][3]
-        ymax0 = predictions[0][n][2]
-
-        for j in range(i+1, vaildCnt):
-            m = candidateBox[0][j]
-
-            if m == -1:
-                continue
-
-            xmin1 = predictions[0][m][1]
-            ymin1 = predictions[0][m][0]
-            xmax1 = predictions[0][m][3]
-            ymax1 = predictions[0][m][2]
-
-            iou = CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1)
-
-            if iou >= 0.45:
-                candidateBox[0][j] = -1
-
+    scores = outputs[0].squeeze(axis=0)
+    boxes = outputs[1].squeeze(axis=0)
+    boxes, labels, probs = postprocessing(boxes, scores)
+    
     # Draw result
-    for i in range(0, vaildCnt):
-        if candidateBox[0][i] == -1:
-            continue
+    color = np.random.uniform(0, 255, size=(3, 3))
+    for i in range(boxes.shape[0]):
+        box = boxes[i, :]
+        label = f"{CLASSES[labels[i]]}: {probs[i]:.2f}"
 
-        n = candidateBox[0][i]
+        i_color = int(labels[i])
+        box = [round(b.item()) for b in box]
 
-        xmin = max(0.0, min(1.0, predictions[0][n][1])) * IMG_SIZE[0]
-        ymin = max(0.0, min(1.0, predictions[0][n][0])) * IMG_SIZE[1]
-        xmax = max(0.0, min(1.0, predictions[0][n][3])) * IMG_SIZE[0]
-        ymax = max(0.0, min(1.0, predictions[0][n][2])) * IMG_SIZE[1]
+        cv2.rectangle(orig_img, (box[0], box[1]), (box[2], box[3]), color[i_color], 2)
 
-        # print("%d @ (%d, %d) (%d, %d) score=%f" % (topClassScoreIndex, xmin, ymin, xmax, ymax, topClassScore))
-        cv2.rectangle(orig_img, (int(xmin), int(ymin)), (int(xmax), int(ymax)),
-                      (random.random()*255, random.random()*255, random.random()*255), 3)
+        cv2.putText(orig_img, label,
+					(box[0] - 10, box[1] - 10),
+					cv2.FONT_HERSHEY_SIMPLEX,
+					1,  # font scale
+					color[i_color],
+					2)  # line type
 
     cv2.imwrite("out.jpg", orig_img)
 
