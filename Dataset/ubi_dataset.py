@@ -32,7 +32,8 @@ class UBI_Dataset:
 		# if the labels file exists, read in the class names
 		# label_file_name = self.root + "labels.txt"
   
-		label_file_name = os.path.join('/', *self.datapath.split('/')[0:-3], 'models/labels.txt')
+		# label_file_name = os.path.join('/', *self.datapath.split('/')[0:-3], 'models/labels.txt')
+		label_file_name = '/root/ubi/UBI_SSD/models/labels.txt'
 		if os.path.exists(label_file_name):
       
 			# prepend BACKGROUND as first class
