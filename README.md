@@ -29,7 +29,7 @@ Object Detection with SSD on UBI Datasets.
 ```bashrc
 $ mkdir ubi
 $ cd ubi
-$ git clone https://github.com/pete710592/UBI_Dataset.git
+$ git clone https://github.com/yue-723/UBI_Dataset.git
 ```
 2. Get model
 ```bashrc
