@@ -57,7 +57,7 @@ class InvertedResidual(nn.Module):
                     ReLU(inplace=True),
                     # pw-linear
                     nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
-                    nn.BatchNorm2d(oup),
+                    # nn.BatchNorm2d(oup),
                 )
             else:
                 self.conv = nn.Sequential(
@@ -80,7 +80,7 @@ class InvertedResidual(nn.Module):
                     ReLU(inplace=True),
                     # pw-linear
                     nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
-                    nn.BatchNorm2d(oup),
+                    # nn.BatchNorm2d(oup),
                 )
             else:
                 self.conv = nn.Sequential(

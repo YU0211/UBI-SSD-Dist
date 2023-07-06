@@ -69,7 +69,7 @@ parser.add_argument('--last_epoch', default=-1, type=int,
                     help='Resume training start from last epoch')
 
 # Scheduler
-parser.add_argument('--scheduler', default="multi-step", type=str,
+parser.add_argument('--scheduler', default="cosine", type=str,
                     help="Scheduler for SGD. It can one of multi-step and cosine")
 
 # Params for Multi-step Scheduler
@@ -77,7 +77,7 @@ parser.add_argument('--milestones', default="80,100", type=str,
                     help="milestones for MultiStepLR")
 
 # Params for Cosine Annealing
-parser.add_argument('--t_max', default=120, type=float,
+parser.add_argument('--t_max', default=100, type=float,
                     help='T_max value for Cosine Annealing Scheduler.')
 
 # Train params
@@ -102,7 +102,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 args = parser.parse_args()
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 print(DEVICE)
 
 
@@ -117,6 +116,9 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
     running_classification_loss = 0.0
 
     # for tensorboard
+    total_loss = 0.0
+    total_regression_loss = 0.0
+    total_classification_loss = 0.0
     writer = SummaryWriter()
     n_iter = 0
 
@@ -134,15 +136,15 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
             # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5, norm_type=2.0, error_if_nonfinite=False)
             optimizer.step()
             scheduler.step()
-            running_loss += loss.item()
-            running_regression_loss += regression_loss.item()
-            running_classification_loss += classification_loss.item()
-
-        # logging into tensorboard
-        writer.add_scalar('Train/Loss', loss.item(), n_iter)
-        writer.add_scalar('Train/Regression Loss', regression_loss.item(), n_iter)
-        writer.add_scalar('Train/Classification Loss', classification_loss.item(), n_iter)
+        
         n_iter += 1
+        running_loss += loss.item()
+        running_regression_loss += regression_loss.item()
+        running_classification_loss += classification_loss.item()
+        
+        total_loss += loss.item()
+        total_regression_loss += regression_loss.item()
+        total_classification_loss += classification_loss.item()
 
         if i and i % debug_steps == 0:
             avg_loss = running_loss / debug_steps
@@ -157,7 +159,11 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
             running_loss = 0.0
             running_regression_loss = 0.0
             running_classification_loss = 0.0
-
+            # logging into tensorboard
+    writer.add_scalar('Train/Loss', total_loss / epoch, epoch)
+    writer.add_scalar('Train/Regression Loss', total_regression_loss / epoch, epoch)
+    writer.add_scalar('Train/Classification Loss', total_classification_loss / epoch, epoch)
+    
 
 def test(loader, net, criterion, device):
     net.eval()
@@ -182,10 +188,15 @@ def test(loader, net, criterion, device):
         running_classification_loss += classification_loss.item()
     return running_loss / num, running_regression_loss / num, running_classification_loss / num
 
+def GMT_8(sec, what):
+    GMT_8_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+    return GMT_8_time.timetuple()
 
 if __name__ == '__main__':
     timer = Timer()
-
+    logging.Formatter.converter = GMT_8
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logging.info(args)
     if args.net == 'vgg16-ssd':
         create_net = create_vgg_ssd
