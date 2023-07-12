@@ -151,7 +151,7 @@ def parse_opt():
     parser.add_argument('--include', nargs='+', default=['torchscript', 'onnx', 'coreml'], help='include formats')
     parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
     parser.add_argument('--train', action='store_true', help='model.train() mode')
-    parser.add_argument('--optimize', default=True, help='TorchScript: optimize for mobile')
+    parser.add_argument('--optimize', default=False, help='TorchScript: optimize for mobile')
     # parser.add_argument('--dynamic', action='store_true', help='ONNX: dynamic axes')
     # parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
     # parser.add_argument('--opset', type=int, default=13, help='ONNX: opset version')

@@ -4,6 +4,7 @@ import logging
 import sys
 import itertools
 from tqdm import tqdm
+import datetime
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
@@ -109,7 +110,7 @@ if args.use_cuda and torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
     logging.info("Use Cuda.")
 
-def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100, epoch=-1):
+def train(loader, net, criterion, optimizer, scheduler, device, writer, debug_steps=100, epoch=-1):
     net.train(True)
     running_loss = 0.0
     running_regression_loss = 0.0
@@ -119,7 +120,7 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
     total_loss = 0.0
     total_regression_loss = 0.0
     total_classification_loss = 0.0
-    writer = SummaryWriter()
+    
     n_iter = 0
 
     for i, data in tqdm(enumerate(loader), total=len(loader)):
@@ -160,9 +161,9 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
             running_regression_loss = 0.0
             running_classification_loss = 0.0
             # logging into tensorboard
-    writer.add_scalar('Train/Loss', total_loss / epoch, epoch)
-    writer.add_scalar('Train/Regression Loss', total_regression_loss / epoch, epoch)
-    writer.add_scalar('Train/Classification Loss', total_classification_loss / epoch, epoch)
+    writer.add_scalar('Train/Loss', total_loss / n_iter, epoch)
+    writer.add_scalar('Train/Regression Loss', total_regression_loss / n_iter, epoch)
+    writer.add_scalar('Train/Classification Loss', total_classification_loss / n_iter, epoch)
     
 
 def test(loader, net, criterion, device):
@@ -326,10 +327,11 @@ if __name__ == '__main__':
 
     logging.info(f"Start training from epoch {last_epoch + 1}.")
     best_loss = np.finfo(np.float32).max
+    writer = SummaryWriter()
     for epoch in range(last_epoch + 1, args.num_epochs):
        
         train(train_loader, net, criterion, optimizer, scheduler,
-              device=DEVICE, debug_steps=args.debug_steps, epoch=epoch)
+              device=DEVICE, writer=writer, debug_steps=args.debug_steps, epoch=epoch)
         
         val_loss, val_regression_loss, val_classification_loss = test(val_loader, net, criterion, DEVICE)
         logging.info(

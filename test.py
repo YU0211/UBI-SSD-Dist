@@ -50,7 +50,7 @@ if __name__ == "__main__":
 	elif net_type == 'mb1-ssd-lite':
 		predictor = create_mobilenetv1_ssd_lite_predictor(net, candidate_size=200)
 	elif net_type == 'mb2-ssd-lite':
-		predictor = create_mobilenetv2_ssd_lite_predictor(net, candidate_size=200, nms_method="soft")
+		predictor = create_mobilenetv2_ssd_lite_predictor(net, candidate_size=200)
 	else:
 		print("The net type is wrong. It should be one of vgg16-ssd, mb1-ssd and mb1-ssd-lite.")
 		sys.exit(1)
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 	color = np.random.uniform(0, 255, size = (10, 3))
 
 	timer.start()
-	boxes, labels, probs = predictor.predict(image, 20, 0.1)
+	boxes, labels, probs = predictor.predict(image, 20, 0.3)
 	interval = timer.end()
 	print('Time: {:.2f}s, Detect Objects: {:d}.'.format(interval, labels.size(0)))
 
@@ -88,5 +88,5 @@ if __name__ == "__main__":
 
 	print(orig_image.shape)
 
-	cv2.imwrite('./outputs/' + img_name, orig_image)
+	cv2.imwrite('./Outputs/' + img_name, orig_image)
 	print("Check the result!")
