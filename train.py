@@ -327,7 +327,7 @@ if __name__ == '__main__':
     for epoch in range(last_epoch + 1, args.num_epochs):
        
         train_loss, train_regression_loss, train_classification_loss = train(
-            train_loader, net, criterion, optimizer,scheduler,device=DEVICE, writer=writer, debug_steps=args.debug_steps, epoch=epoch)
+            train_loader, net, criterion, optimizer,scheduler,device=DEVICE, debug_steps=args.debug_steps, epoch=epoch)
         
         val_loss, val_regression_loss, val_classification_loss = test(val_loader, net, criterion, DEVICE)
         # logging into tensorboard
