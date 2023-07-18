@@ -359,3 +359,6 @@ if __name__ == '__main__':
         model_path = os.path.join(args.checkpoint_folder, f"{args.net}-Epoch-{epoch}.pth")
         net.save(model_path)
         logging.info(f"Saved model {model_path}")
+        
+        writer.add_graph(net, torch.randn(1,3,300,300))
+        writer.close()
