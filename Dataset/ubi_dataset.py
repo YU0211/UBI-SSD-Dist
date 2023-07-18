@@ -1,22 +1,18 @@
 import numpy as np
 import logging
-import pathlib
+from pathlib import Path
 import xml.etree.ElementTree as ET
 import cv2
 import os
 
 
 class UBI_Dataset:
-
-	def __init__(self, root, transform=None, target_transform=None, dataset_type='train', keep_difficult=False, label_file=None):
+	def __init__(self, root, transform=None, target_transform=None, dataset_type='train', keep_difficult=False):
 		"""Dataset for VOC data.
 		Args:
 			root: the root of the VOC2007 or VOC2012 dataset, the directory contains the following sub-directories:
 				Annotations, ImageSets, JPEGImages, SegmentationClass, SegmentationObject.
 		"""
-		# self.root = self.root / "ssd_project/ssd-pytorch-leanh"
-		# self.root = './data/VOCdevkit/'
-
 		self.datapath = root
   
 		self.transform = transform
@@ -25,35 +21,22 @@ class UBI_Dataset:
 		self.dataset_type = dataset_type
 		self.image_sets_file = os.path.join(self.datapath, f'{dataset_type}.txt')
 		
-  
 		self.ids = UBI_Dataset._read_image_ids(self.image_sets_file)
 		self.keep_difficult = keep_difficult
 
-		# if the labels file exists, read in the class names
-		# label_file_name = self.root + "labels.txt"
-  
-		# label_file_name = os.path.join('/', *self.datapath.split('/')[0:-3], 'models/labels.txt')
-		label_file_name = '../models/labels.txt'
-		if os.path.exists(label_file_name):
-      
+		label_file = os.path.join(os.getcwd(), 'models/labels.txt')
+		if os.path.exists(label_file):
 			# prepend BACKGROUND as first class
 			classes = ['BACKGROUND']
    
-			with open(label_file_name, 'r') as infile:
+			with open(label_file, 'r') as infile:
 				for line in infile:
 					classes.append(line.rstrip())  
 			classes = [ elem.replace(" ", "") for elem in classes]
 			self.class_names = tuple(classes)
-			logging.info("VOC Labels read from file: " + str(self.class_names))
+			logging.info("UBI Labels read from file: " + str(self.class_names))
 		else:
-			logging.info("No labels file, using default VOC classes.")
-			# self.class_names = ('BACKGROUND',
-			# 'aeroplane', 'bicycle', 'bird', 'boat',
-			# 'bottle', 'bus', 'car', 'cat', 'chair',
-			# 'cow', 'diningtable', 'dog', 'horse',
-			# 'motorbike', 'person', 'pottedplant',
-			# 'sheep', 'sofa', 'train', 'tvmonitor')
-
+			logging.info("No labels file, using default classes.")
 			self.class_names = ('BACKGROUND', "vehicle", "rider", "pedestrian") 
 
 

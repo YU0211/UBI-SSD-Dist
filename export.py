@@ -23,8 +23,7 @@ def export_torchscript(model, img, file, optimize):
     prefix = 'TorchScript:'
     try:
         print(f'\n{prefix} starting export with torch {torch.__version__}...')
-        f = file.with_suffix('.torchscript_optim.pt' if optimize else '.torchscript.pt')
-        f = str(f)
+        f = str(file.with_suffix('.torchscript_optim.pt' if optimize else '.torchscript.pt'))
         ts = torch.jit.trace(model, img, strict=False)
         (optimize_for_mobile(ts) if optimize else ts).save(f)
         print(f'{prefix} export success, saved as {f} ({compute_file_size(f):.1f} MB)')
@@ -85,7 +84,7 @@ def run(
         include=('torchscript', 'onnx'),  # include formats
         half=False,  # FP16 half-precision export
         train=False,  # model.train() mode
-        optimize=True,  # TorchScript: optimize for mobile
+        optimize=False,  # TorchScript: optimize for mobile
         # dynamic=False,  # ONNX: dynamic axes
         # simplify=False,  # ONNX: simplify model
         # opset=12,  # ONNX: opset version
@@ -101,7 +100,7 @@ def run(
     
     assert not (device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
     
-    label_path = "models/voc-model-labels.txt"
+    label_path = "models/ubi-model-labels.txt"
 
     class_names = [name.strip() for name in open(label_path).readlines()]
     print(len(class_names))
@@ -151,26 +150,22 @@ def parse_opt():
     parser.add_argument('--include', nargs='+', default=['torchscript', 'onnx', 'coreml'], help='include formats')
     parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
     parser.add_argument('--train', action='store_true', help='model.train() mode')
-    parser.add_argument('--optimize', default=False, help='TorchScript: optimize for mobile')
+    parser.add_argument('--optimize', action='store_true', help='TorchScript: optimize for mobile')
     # parser.add_argument('--dynamic', action='store_true', help='ONNX: dynamic axes')
     # parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
     # parser.add_argument('--opset', type=int, default=13, help='ONNX: opset version')
-    opt = parser.parse_args()
-    return opt
+    return parser.parse_args()
 
 def GMT_8(sec, what):
     GMT_8_time = datetime.datetime.now() + datetime.timedelta(hours=8)
     return GMT_8_time.timetuple()
 
-def main(opt):
+if __name__ == "__main__":
+    opt = parse_opt()
+    
     logging.Formatter.converter = GMT_8
     logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logging.info('export: ' + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
 
     run(**vars(opt))
-
-
-if __name__ == "__main__":
-    opt = parse_opt()
-    main(opt)

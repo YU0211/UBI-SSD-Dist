@@ -26,16 +26,16 @@ from vision.ssd.data_preprocessing import TrainAugmentation, TestTransform
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Training With Pytorch')
 
-parser.add_argument("--dataset_type", default="voc", type=str,
+parser.add_argument("--dataset_type", default="ubi", type=str,
                     help='Specify dataset type. Currently support voc and open_images.')
 
-parser.add_argument('--datasets', nargs='+', help='Dataset directory path')
-parser.add_argument('--validation_dataset', help='Dataset directory path')
+parser.add_argument('--datasets', default=["../Data/train/"], nargs='+', help='Dataset directory path')
+parser.add_argument('--validation_dataset', default="../Data/val/", type=str, help='Dataset directory path')
 parser.add_argument('--balance_data', action='store_true',
                     help="Balance training data by down-sampling more frequent labels.")
 
 
-parser.add_argument('--net', default="vgg16-ssd",
+parser.add_argument('--net', default="mb2-ssd-lite",
                     help="The network architecture, it can be mb1-ssd, mb1-lite-ssd, mb2-ssd-lite or vgg16-ssd.")
 parser.add_argument('--freeze_base_net', action='store_true',
                     help="Freeze base net layers.")
@@ -74,17 +74,17 @@ parser.add_argument('--scheduler', default="cosine", type=str,
                     help="Scheduler for SGD. It can one of multi-step and cosine")
 
 # Params for Multi-step Scheduler
-parser.add_argument('--milestones', default="80,100", type=str,
+parser.add_argument('--milestones', default="80,120,160", type=str,
                     help="milestones for MultiStepLR")
 
 # Params for Cosine Annealing
-parser.add_argument('--t_max', default=100, type=float,
+parser.add_argument('--t_max', default=200, type=float,
                     help='T_max value for Cosine Annealing Scheduler.')
 
 # Train params
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=64, type=int,
                     help='Batch size for training')
-parser.add_argument('--num_epochs', default=120, type=int,
+parser.add_argument('--num_epochs', default=200, type=int,
                     help='the number epochs')
 parser.add_argument('--num_workers', default=8, type=int,
                     help='Number of workers used in dataloading')
@@ -98,9 +98,14 @@ parser.add_argument('--use_cuda', default=True, type=str2bool,
 parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
 
+def GMT_8(sec, what):
+    GMT_8_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+    return GMT_8_time.timetuple()
 
+logging.Formatter.converter = GMT_8
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 args = parser.parse_args()
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(DEVICE)
@@ -110,7 +115,7 @@ if args.use_cuda and torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
     logging.info("Use Cuda.")
 
-def train(loader, net, criterion, optimizer, scheduler, device, writer, debug_steps=100, epoch=-1):
+def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100, epoch=0):
     net.train(True)
     running_loss = 0.0
     running_regression_loss = 0.0
@@ -160,10 +165,8 @@ def train(loader, net, criterion, optimizer, scheduler, device, writer, debug_st
             running_loss = 0.0
             running_regression_loss = 0.0
             running_classification_loss = 0.0
-            # logging into tensorboard
-    writer.add_scalar('Train/Loss', total_loss / n_iter, epoch)
-    writer.add_scalar('Train/Regression Loss', total_regression_loss / n_iter, epoch)
-    writer.add_scalar('Train/Classification Loss', total_classification_loss / n_iter, epoch)
+            
+    return total_loss / n_iter, total_regression_loss / n_iter, total_classification_loss / n_iter
     
 
 def test(loader, net, criterion, device):
@@ -184,21 +187,15 @@ def test(loader, net, criterion, device):
             regression_loss, classification_loss = criterion(confidence, locations, labels, boxes)
             loss = regression_loss + classification_loss
 
-        running_loss += loss.item()
-        running_regression_loss += regression_loss.item()
-        running_classification_loss += classification_loss.item()
-    return running_loss / num, running_regression_loss / num, running_classification_loss / num
-
-def GMT_8(sec, what):
-    GMT_8_time = datetime.datetime.now() + datetime.timedelta(hours=8)
-    return GMT_8_time.timetuple()
+        total_loss += loss.item()
+        total_regression_loss += regression_loss.item()
+        total_classification_loss += classification_loss.item()
+    return total_loss / num, total_regression_loss / num, total_classification_loss / num
 
 if __name__ == '__main__':
     timer = Timer()
-    logging.Formatter.converter = GMT_8
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logging.info(args)
+    
     if args.net == 'vgg16-ssd':
         create_net = create_vgg_ssd
         config = vgg_ssd_config
@@ -224,13 +221,12 @@ if __name__ == '__main__':
     logging.info("Prepare training datasets.")
     datasets = []
     for dataset_path in args.datasets:
-        if args.dataset_type == 'voc':
+        if args.dataset_type == 'ubi':
             dataset = UBI_Dataset(dataset_path, transform=train_transform,
                                  target_transform=target_transform, dataset_type="train")
-            label_file = os.path.join(args.checkpoint_folder, "voc-model-labels.txt")
+            label_file = os.path.join(args.checkpoint_folder, "ubi-model-labels.txt")
             store_labels(label_file, dataset.class_names)
             num_classes = len(dataset.class_names)
-
         else:
             raise ValueError(f"Dataset type {args.dataset_type} is not supported.")
         datasets.append(dataset)
@@ -241,7 +237,7 @@ if __name__ == '__main__':
                               num_workers=args.num_workers,
                               shuffle=True)
     logging.info("Prepare Validation datasets.")
-    if args.dataset_type == "voc":
+    if args.dataset_type == "ubi":
         val_dataset = UBI_Dataset(args.validation_dataset, transform=test_transform,
                                  target_transform=target_transform, dataset_type="val")
         logging.info(val_dataset)
@@ -252,7 +248,7 @@ if __name__ == '__main__':
                             shuffle=False)
     logging.info("Build network.")
     net = create_net(num_classes)
-    min_loss = -10000.0
+    min_loss = np.finfo(np.float32).min
     last_epoch = args.last_epoch
 
     base_net_lr = args.base_net_lr if args.base_net_lr is not None else args.lr
@@ -330,10 +326,24 @@ if __name__ == '__main__':
     writer = SummaryWriter()
     for epoch in range(last_epoch + 1, args.num_epochs):
        
-        train(train_loader, net, criterion, optimizer, scheduler,
-              device=DEVICE, writer=writer, debug_steps=args.debug_steps, epoch=epoch)
+        train_loss, train_regression_loss, train_classification_loss = train(
+            train_loader, net, criterion, optimizer,scheduler,device=DEVICE, writer=writer, debug_steps=args.debug_steps, epoch=epoch)
         
         val_loss, val_regression_loss, val_classification_loss = test(val_loader, net, criterion, DEVICE)
+        # logging into tensorboard
+        writer.add_scalar('Total Loss', {
+            'Training': train_loss,
+            'Validation': val_loss,
+        }, epoch)
+        writer.add_scalar('Regression Loss', {
+            'Training': train_regression_loss,
+            'Validation': val_regression_loss,
+        }, epoch)
+        writer.add_scalar('Classification Loss', {
+            'Training': train_classification_loss,
+            'Validation': val_classification_loss,
+        }, epoch)
+    
         logging.info(
             f"Epoch: {epoch}, " +
             f"Validation Loss: {val_loss:.4f}, " +
