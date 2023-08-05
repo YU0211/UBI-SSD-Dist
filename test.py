@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import cv2
 import sys
 import numpy as np
+import pathlib
 
 
 if __name__ == "__main__":
@@ -20,7 +21,7 @@ if __name__ == "__main__":
 
 	img_path, model_path, net_type = sys.argv[1], sys.argv[2], sys.argv[3]
 	timer = Timer()
-	label_path = "models/voc-model-labels.txt"
+	label_path = "models/ubi-model-labels.txt"
 
 	img_name = img_path.split("/")[-1]
 
@@ -64,7 +65,7 @@ if __name__ == "__main__":
 	color = np.random.uniform(0, 255, size = (10, 3))
 
 	timer.start()
-	boxes, labels, probs = predictor.predict(image, 20, 0.3)
+	boxes, labels, probs = predictor.predict(image, 20, 0.4)
 	interval = timer.end()
 	print('Time: {:.2f}s, Detect Objects: {:d}.'.format(interval, labels.size(0)))
 
@@ -87,6 +88,6 @@ if __name__ == "__main__":
 					2)  # line type
 
 	print(orig_image.shape)
-
-	cv2.imwrite('./Outputs/' + img_name, orig_image)
+	pathlib.Path('./outputs/').mkdir(exist_ok=True) 
+	cv2.imwrite('./outputs/' + img_name, orig_image)
 	print("Check the result!")

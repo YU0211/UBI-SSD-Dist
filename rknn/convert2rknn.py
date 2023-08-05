@@ -28,20 +28,23 @@ def CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
     w = max(0.0, min(xmax0, xmax1) - max(xmin0, xmin1))
     h = max(0.0, min(ymax0, ymax1) - max(ymin0, ymin1))
     i = w * h
-    u = (xmax0 - xmin0) * (ymax0 - ymin0) + (xmax1 - xmin1) * (ymax1 - ymin1) - i
+    u = (xmax0 - xmin0) * (ymax0 - ymin0) + \
+        (xmax1 - xmin1) * (ymax1 - ymin1) - i
 
     if u <= 0.0:
         return 0.0
 
     return i / u
 
+
 def area_of(left_top, right_bottom):
     overlap_wh = np.clip(right_bottom - left_top, 0.0, None)
     return overlap_wh[:, 0] * overlap_wh[:, 1]
 
+
 def cal_iou(bbox, gt, eps=1e-5):
-    left_top = np.maximum(bbox[:, :2],gt[:, :2])
-    right_bottom = np.minimum(bbox[:, 2:4],gt[:, 2:4])
+    left_top = np.maximum(bbox[:, :2], gt[:, :2])
+    right_bottom = np.minimum(bbox[:, 2:4], gt[:, 2:4])
     overlap_area = area_of(left_top, right_bottom)
 
     bbox_area = area_of(bbox[:, :2], bbox[:, 2:])
@@ -70,6 +73,7 @@ def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
 
     return box_scores[picked, :]
 
+
 def postprocessing(boxes, scores):
     picked_box_probs = []
     picked_labels = []
@@ -80,15 +84,16 @@ def postprocessing(boxes, scores):
         if probs.shape[0] == 0:
             continue
         subset_boxes = boxes[mask, :]
-        box_probs = np.concatenate([subset_boxes, probs.reshape(-1, 1)], axis=1)
+        box_probs = np.concatenate(
+            [subset_boxes, probs.reshape(-1, 1)], axis=1)
         box_probs = hard_nms(box_probs,
-                             iou_threshold = IOU_THRESH,
-                             top_k = TOP_K,
-                             candidate_size = CANDIDATE_SIZE)
+                             iou_threshold=IOU_THRESH,
+                             top_k=TOP_K,
+                             candidate_size=CANDIDATE_SIZE)
         picked_box_probs.append(box_probs)
         picked_labels.extend([class_index] * box_probs.shape[0])
     if not picked_box_probs:
-        raise(f"Didn't catch the specified object: ${CLASSES}")
+        raise (f"Didn't catch the specified object: ${CLASSES}")
     picked_box_probs = np.asarray(picked_box_probs)
     picked_box_probs = np.concatenate(picked_box_probs, axis=0)
     picked_box_probs[:, 0] *= ORIG_IMG_SIZE[0]
@@ -96,6 +101,7 @@ def postprocessing(boxes, scores):
     picked_box_probs[:, 2] *= ORIG_IMG_SIZE[0]
     picked_box_probs[:, 3] *= ORIG_IMG_SIZE[1]
     return picked_box_probs[:, :4], picked_labels, picked_box_probs[:, 4]
+
 
 if __name__ == '__main__':
 
@@ -112,7 +118,8 @@ if __name__ == '__main__':
 
     # Load TensorFlow Model
     print('--> Loading model')
-    ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[[3,INPUT_IMG_SIZE[1], INPUT_IMG_SIZE[0]]])
+    ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[
+                            [3, INPUT_IMG_SIZE[1], INPUT_IMG_SIZE[0]]])
     if ret != 0:
         print('Load model failed!')
         exit(ret)
@@ -135,7 +142,11 @@ if __name__ == '__main__':
     print('done')
 
     # Direct Load RKNN Model
-    rknn.load_rknn(RKNN_MODEL)
+    ret = rknn.load_rknn(RKNN_MODEL)
+    if ret != 0:
+        print('Load RKNN model failed!')
+        exit(ret)
+    print('done')
 
     # Set inputs
     orig_img = cv2.imread(IMG_PATH)
@@ -158,7 +169,7 @@ if __name__ == '__main__':
     scores = outputs[0].squeeze(axis=0)
     boxes = outputs[1].squeeze(axis=0)
     boxes, labels, probs = postprocessing(boxes, scores)
-    
+
     # Draw result
     color = np.random.uniform(0, 255, size=(3, 3))
     for i in range(boxes.shape[0]):
@@ -168,14 +179,15 @@ if __name__ == '__main__':
         i_color = int(labels[i])
         box = [round(b.item()) for b in box]
 
-        cv2.rectangle(orig_img, (box[0], box[1]), (box[2], box[3]), color[i_color], 2)
+        cv2.rectangle(orig_img, (box[0], box[1]),
+                      (box[2], box[3]), color[i_color], 2)
 
         cv2.putText(orig_img, label,
-					(box[0] - 10, box[1] - 10),
-					cv2.FONT_HERSHEY_SIMPLEX,
-					1,  # font scale
-					color[i_color],
-					2)  # line type
+                    (box[0] - 10, box[1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,  # font scale
+                    color[i_color],
+                    2)  # line type
 
     cv2.imwrite("out.jpg", orig_img)
 

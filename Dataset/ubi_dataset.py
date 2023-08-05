@@ -7,122 +7,128 @@ import os
 
 
 class UBI_Dataset:
-	def __init__(self, root, transform=None, target_transform=None, dataset_type='train', keep_difficult=False):
-		"""Dataset for VOC data.
-		Args:
-			root: the root of the VOC2007 or VOC2012 dataset, the directory contains the following sub-directories:
-				Annotations, ImageSets, JPEGImages, SegmentationClass, SegmentationObject.
-		"""
-		self.datapath = root
-  
-		self.transform = transform
-		self.target_transform = target_transform
+    def __init__(self, root, transform=None, target_transform=None, dataset_type='train', keep_difficult=False):
+        """Dataset for VOC data.
+        Args:
+                root: the root of the VOC2007 or VOC2012 dataset, the directory contains the following sub-directories:
+                        Annotations, ImageSets, JPEGImages, SegmentationClass, SegmentationObject.
+        """
+        self.datapath = root
 
-		self.dataset_type = dataset_type
-		self.image_sets_file = os.path.join(self.datapath, f'{dataset_type}.txt')
-		
-		self.ids = UBI_Dataset._read_image_ids(self.image_sets_file)
-		self.keep_difficult = keep_difficult
+        self.transform = transform
+        self.target_transform = target_transform
 
-		label_file = os.path.join(os.getcwd(), 'models/labels.txt')
-		if os.path.exists(label_file):
-			# prepend BACKGROUND as first class
-			classes = ['BACKGROUND']
-   
-			with open(label_file, 'r') as infile:
-				for line in infile:
-					classes.append(line.rstrip())  
-			classes = [ elem.replace(" ", "") for elem in classes]
-			self.class_names = tuple(classes)
-			logging.info("UBI Labels read from file: " + str(self.class_names))
-		else:
-			logging.info("No labels file, using default classes.")
-			self.class_names = ('BACKGROUND', "vehicle", "rider", "pedestrian") 
+        self.dataset_type = dataset_type
+        self.image_sets_file = os.path.join(
+            self.datapath, f'{dataset_type}.txt')
 
+        self.ids = UBI_Dataset._read_image_ids(self.image_sets_file)
+        self.keep_difficult = keep_difficult
 
-		self.class_dict = {class_name: i for i, class_name in enumerate(self.class_names)}
+        # label_file = os.path.join(os.getcwd(), 'models/voc-labels.txt')
+        label_file = os.path.join(os.getcwd(), 'models/ubi-labels.txt')
+        if os.path.exists(label_file):
+            # prepend BACKGROUND as first class
+            classes = ['BACKGROUND']
 
-	def __getitem__(self, index):
-		image_id = self.ids[index]
-		boxes, labels, is_difficult = self._get_annotation(image_id)
-		if not self.keep_difficult:
-			boxes = boxes[is_difficult == 0]
-			labels = labels[is_difficult == 0]
-		image = self._read_image(image_id)
-		if self.transform:
-			image, boxes, labels = self.transform(image, boxes, labels)
-		if self.target_transform:
-			boxes, labels = self.target_transform(boxes, labels)
-		return image, boxes, labels
+            with open(label_file, 'r') as infile:
+                for line in infile:
+                    classes.append(line.rstrip())
+            classes = [elem.replace(" ", "") for elem in classes]
+            self.class_names = tuple(classes)
+            logging.info("UBI Labels read from file: " + str(self.class_names))
+        else:
+            logging.info("No labels file, using default classes.")
 
-	def get_image(self, index):
-		image_id = self.ids[index]
-		image = self._read_image(image_id)
-		if self.transform:
-			image, _ = self.transform(image)
-		return image
+            self.class_names = ('BACKGROUND', "vehicle", "rider", "pedestrian")
+            # self.class_names = ('BACKGROUND',
+            # 'aeroplane', 'bicycle', 'bird', 'boat',
+            # 'bottle', 'bus', 'car', 'cat', 'chair',
+            # 'cow', 'diningtable', 'dog', 'horse',
+            # 'motorbike', 'person', 'pottedplant',
+            # 'sheep', 'sofa', 'train', 'tvmonitor')
 
-	def get_annotation(self, index):
-		image_id = self.ids[index]
-		return image_id, self._get_annotation(image_id)
+        self.class_dict = {class_name: i for i,
+                           class_name in enumerate(self.class_names)}
 
-	def __len__(self):
-		return len(self.ids)
+    def __getitem__(self, index):
+        image_id = self.ids[index]
+        boxes, labels, is_difficult = self._get_annotation(image_id)
+        if not self.keep_difficult:
+            boxes = boxes[is_difficult == 0]
+            labels = labels[is_difficult == 0]
+        image = self._read_image(image_id)
+        if self.transform:
+            image, boxes, labels = self.transform(image, boxes, labels)
+        if self.target_transform:
+            boxes, labels = self.target_transform(boxes, labels)
+        return image, boxes, labels
 
-	@staticmethod
-	def _read_image_ids(image_sets_file):
-		ids = []
-		with open(image_sets_file) as f:
-			for line in f:
-				ids.append(line.rstrip())
-		return ids
+    def get_image(self, index):
+        image_id = self.ids[index]
+        image = self._read_image(image_id)
+        if self.transform:
+            image, _ = self.transform(image)
+        return image
 
-	def _get_annotation(self, image_id):
+    def get_annotation(self, index):
+        image_id = self.ids[index]
+        return image_id, self._get_annotation(image_id)
 
-		annotation_file = os.path.join(self.datapath, "labels", f"{image_id}.xml")
-   
-		objects = ET.parse(annotation_file).findall("object")
+    def __len__(self):
+        return len(self.ids)
 
-		boxes = []
-		labels = []
-		is_difficult = []
-		for object in objects:
-			class_name = object.find('name').text.lower().strip()
-			# we're only concerned with clases in our list
-			if class_name in self.class_dict:
-				bbox = object.find('bndbox')
+    @staticmethod
+    def _read_image_ids(image_sets_file):
+        ids = []
+        with open(image_sets_file) as f:
+            for line in f:
+                ids.append(line.rstrip())
+        return ids
 
-				# VOC dataset format follows Matlab, in which indexes start from 0
-				x1 = float(bbox.find('xmin').text) - 1
-				y1 = float(bbox.find('ymin').text) - 1
-				x2 = float(bbox.find('xmax').text) - 1
-				y2 = float(bbox.find('ymax').text) - 1
+    def _get_annotation(self, image_id):
 
-				if x1 > x2:
-					x1, x2 = x2, x1
-				if y1 > y2:
-					y1, y2 = y2, y1
-     
-				boxes.append([x1, y1, x2, y2])
+        annotation_file = os.path.join(
+            self.datapath, "labels", f"{image_id}.xml")
 
-				labels.append(self.class_dict[class_name])
+        objects = ET.parse(annotation_file).findall("object")
 
-				try:
-					is_difficult_str = object.find('difficult').text
-				except:
-					# is_difficult.append(int(is_difficult_str) if is_difficult_str else 0)
-					is_difficult.append(0)
+        boxes = []
+        labels = []
+        is_difficult = []
+        for obj in objects:
+            class_name = obj.find('name').text.lower().strip()
+            # we're only concerned with clases in our list
+            if class_name in self.class_dict:
+                bbox = obj.find('bndbox')
 
-		return (np.array(boxes, dtype=np.float32),
-				np.array(labels, dtype=np.int64),
-				np.array(is_difficult, dtype=np.uint8))
+                # VOC dataset format follows Matlab, in which indexes start from 0
+                x1 = float(bbox.find('xmin').text) - 1
+                y1 = float(bbox.find('ymin').text) - 1
+                x2 = float(bbox.find('xmax').text) - 1
+                y2 = float(bbox.find('ymax').text) - 1
 
-	def _read_image(self, image_id):
+                if x1 > x2:
+                    x1, x2 = x2, x1
+                if y1 > y2:
+                    y1, y2 = y2, y1
 
+                boxes.append([x1, y1, x2, y2])
 
-		image_file = os.path.join(self.datapath, "images", f"{image_id}.jpg")
+                labels.append(self.class_dict[class_name])
 
-		image = cv2.imread(image_file)
-		image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                is_difficult.append(
+                    int(obj.find('difficult').text) if obj.find('difficult') else 0)
 
-		return image
+        return (np.array(boxes, dtype=np.float32),
+                np.array(labels, dtype=np.int64),
+                np.array(is_difficult, dtype=np.uint8))
+
+    def _read_image(self, image_id):
+
+        image_file = os.path.join(self.datapath, "images", f"{image_id}.jpg")
+
+        image = cv2.imread(image_file)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        return image

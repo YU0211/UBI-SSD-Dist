@@ -68,6 +68,8 @@ parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--last_epoch', default=-1, type=int,
                     help='Resume training start from last epoch')
+parser.add_argument('--log_dir', default=None, type=str,
+                    help='Path for saving log by tensorboard')
 
 # Scheduler
 parser.add_argument('--scheduler', default="cosine", type=str,
@@ -78,7 +80,7 @@ parser.add_argument('--milestones', default="80,120,160", type=str,
                     help="milestones for MultiStepLR")
 
 # Params for Cosine Annealing
-parser.add_argument('--t_max', default=200, type=float,
+parser.add_argument('--t_max', default=120, type=float,
                     help='T_max value for Cosine Annealing Scheduler.')
 
 # Train params
@@ -86,7 +88,7 @@ parser.add_argument('--batch_size', default=64, type=int,
                     help='Batch size for training')
 parser.add_argument('--num_epochs', default=200, type=int,
                     help='the number epochs')
-parser.add_argument('--num_workers', default=8, type=int,
+parser.add_argument('--num_workers', default=12, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--validation_epochs', default=5, type=int,
                     help='the number epochs')
@@ -129,19 +131,19 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
     n_iter = 0
 
     for i, data in tqdm(enumerate(loader), total=len(loader)):
-        with torch.cuda.amp.autocast():
-            images, boxes, labels = data
-            images = images.to(device)
-            boxes = boxes.to(device)
-            labels = labels.to(device)
-            optimizer.zero_grad()
-            confidence, locations = net(images)
-            regression_loss, classification_loss = criterion(confidence, locations, labels, boxes)  # TODO CHANGE BOXES
-            loss = regression_loss + classification_loss
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5, norm_type=2.0, error_if_nonfinite=False)
-            optimizer.step()
-            scheduler.step()
+        # with torch.cuda.amp.autocast():
+        images, boxes, labels = data
+        images = images.to(device)
+        boxes = boxes.to(device)
+        labels = labels.to(device)
+        optimizer.zero_grad()
+        confidence, locations = net(images)
+        regression_loss, classification_loss = criterion(confidence, locations, labels, boxes)  # TODO CHANGE BOXES
+        loss = regression_loss + classification_loss
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5, norm_type=2.0, error_if_nonfinite=False)
+        optimizer.step()
+        scheduler.step()
         
         n_iter += 1
         running_loss += loss.item()
@@ -171,9 +173,9 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
 
 def test(loader, net, criterion, device):
     net.eval()
-    running_loss = 0.0
-    running_regression_loss = 0.0
-    running_classification_loss = 0.0
+    total_loss = 0.0
+    total_regression_loss = 0.0
+    total_classification_loss = 0.0
     num = 0
     for _, data in tqdm(enumerate(loader), total=len(loader)):
         images, boxes, labels = data
@@ -323,7 +325,8 @@ if __name__ == '__main__':
 
     logging.info(f"Start training from epoch {last_epoch + 1}.")
     best_loss = np.finfo(np.float32).max
-    writer = SummaryWriter()
+    writer = SummaryWriter(log_dir=args.log_dir)
+    
     for epoch in range(last_epoch + 1, args.num_epochs):
        
         train_loss, train_regression_loss, train_classification_loss = train(
@@ -331,15 +334,15 @@ if __name__ == '__main__':
         
         val_loss, val_regression_loss, val_classification_loss = test(val_loader, net, criterion, DEVICE)
         # logging into tensorboard
-        writer.add_scalar('Total Loss', {
+        writer.add_scalars('Total Loss', {
             'Training': train_loss,
             'Validation': val_loss,
         }, epoch)
-        writer.add_scalar('Regression Loss', {
+        writer.add_scalars('Regression Loss', {
             'Training': train_regression_loss,
             'Validation': val_regression_loss,
         }, epoch)
-        writer.add_scalar('Classification Loss', {
+        writer.add_scalars('Classification Loss', {
             'Training': train_classification_loss,
             'Validation': val_classification_loss,
         }, epoch)
@@ -360,5 +363,5 @@ if __name__ == '__main__':
         net.save(model_path)
         logging.info(f"Saved model {model_path}")
         
-        writer.add_graph(net, torch.randn(1,3,300,300))
-        writer.close()
+    writer.add_graph(net.to(DEVICE), torch.randn(1,3,300,300).to(DEVICE))
+    writer.close()

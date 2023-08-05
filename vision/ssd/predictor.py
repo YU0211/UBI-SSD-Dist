@@ -1,8 +1,6 @@
 import torch
-
 from ..utils import box_utils
 from .data_preprocessing import PredictionTransform
-from ..utils.misc import Timer
 
 
 class Predictor:
@@ -19,12 +17,11 @@ class Predictor:
         if device:
             self.device = device
         else:
-            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            self.device = torch.device(
+                "cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.net.to(self.device)
         self.net.eval()
-
-        self.timer = Timer()
 
     def predict(self, image, top_k=-1, prob_threshold=None):
         cpu_device = torch.device("cpu")
@@ -33,9 +30,8 @@ class Predictor:
         images = image.unsqueeze(0)
         images = images.to(self.device)
         with torch.no_grad():
-            self.timer.start()
             scores, boxes = self.net.forward(images)
-            print("Inference time: ", self.timer.end())
+
         boxes = boxes[0]
         scores = scores[0]
         if not prob_threshold:
