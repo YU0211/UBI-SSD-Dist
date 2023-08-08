@@ -102,7 +102,7 @@ parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
 
 def GMT_8(sec, what):
-    GMT_8_time = datetime.datetime.now() + datetime.timedelta(hours=8)
+    GMT_8_time = datetime.now() + timedelta(hours=8)
     return GMT_8_time.timetuple()
 
 logging.Formatter.converter = GMT_8
@@ -326,8 +326,8 @@ if __name__ == '__main__':
 
     logging.info(f"Start training from epoch {last_epoch + 1}.")
     best_loss = np.finfo(np.float32).max
+    best_epoch_at = 0
     writer = SummaryWriter(log_dir=args.log_dir)
-    
     for epoch in range(last_epoch + 1, args.num_epochs):
        
         train_loss, train_regression_loss, train_classification_loss = train(
@@ -359,12 +359,15 @@ if __name__ == '__main__':
         pathlib.Path(Model_folder).mkdir(exist_ok=True) 
         if val_loss < best_loss:
             best_loss = val_loss
-            logging.info("====> Better weight saved!!")
+            logging.info("---> Better weight saved!!")
+            best_epoch_at = epoch
             net.save(f'{Model_folder}/best.pth')
                 
         model_path = os.path.join(Model_folder, f"{args.net}-Epoch-{epoch:04d}.pth")
         net.save(model_path)
-        logging.info(f"Saved model {model_path}")
+        logging.info(f"---> Saved model {model_path}")
         
+    logging.info(f"Finish training!! Best model at Epoch-{best_epoch_at} Loss: {best_loss}")
     writer.add_graph(net.to(DEVICE), torch.randn(1,3,300,300).to(DEVICE))
     writer.close()
+
