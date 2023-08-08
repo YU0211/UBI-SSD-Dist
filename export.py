@@ -96,6 +96,7 @@ def run(
 
     # Load PyTorch model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = 'cpu'
     logging.info(f"Device on {device}")
     
     assert not (device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
@@ -116,9 +117,9 @@ def run(
 
     logging.info(f"PyTorch: loading model {net_type} from {weight} ({compute_file_size(weight):.1f} MB)")
     model.load(weight)
-    model.to('cpu')
+    model.to(device)
     # Input
-    img = torch.zeros(batch_size, 3, *img_size).to('cpu')  # image size(1,3,320,192) iDetection
+    img = torch.zeros(batch_size, 3, *img_size).to(device)  # image size(1,3,320,192) iDetection
 
     # Update model
     if half:

@@ -6,8 +6,7 @@ import cv2
 from rknn.api import RKNN
 
 
-# PT_MODEL = '/root/ubi/UBI_Dataset/mobilenets-ssd-pytorch/models/best.torchscript_optim.pt'
-PT_MODEL = '/root/ubi/UBI_Dataset/mobilenets-ssd-pytorch/models/best.torchscript.pt'
+PT_MODEL = '../models/best.torchscript.pt'
 RKNN_MODEL = 'MobilenetV2_SSD_Lite.rknn'
 IMG_PATH = 'test.jpg'
 DATASET = 'dataset.txt'
@@ -142,6 +141,7 @@ if __name__ == '__main__':
     print('done')
 
     # Direct Load RKNN Model
+    print('--> Load rknn model')
     ret = rknn.load_rknn(RKNN_MODEL)
     if ret != 0:
         print('Load RKNN model failed!')

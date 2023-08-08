@@ -13,6 +13,7 @@ import logging
 import sys
 from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite, create_mobilenetv2_ssd_lite_predictor
 from tqdm import tqdm
+from torchsummary import summary
 
 parser = argparse.ArgumentParser(description="SSD Evaluation on UBI Dataset.")
 parser.add_argument('--Skip_infer', action='store_true', help='Do not need to inferance')
@@ -171,7 +172,8 @@ if __name__ == '__main__':
         timer.start("Load Model")
         net.load(args.trained_model)
         net = net.to(DEVICE)
-        print(f'\nIt took {timer.end("Load Model")} seconds to load the model.')
+        print(f'\nIt took {timer.end("Load Model")} seconds to load the model.\n')
+        summary(net, input_size=(3, 300, 300))
         if args.net == 'vgg16-ssd':
             predictor = create_vgg_ssd_predictor(
                 net, nms_method=args.nms_method, device=DEVICE)
