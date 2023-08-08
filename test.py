@@ -1,5 +1,5 @@
 import os
-
+from datetime import datetime, timedelta
 # from click import UsageError
 
 from vision.ssd.vgg_ssd import create_vgg_ssd, create_vgg_ssd_predictor
@@ -12,7 +12,7 @@ import cv2
 import sys
 import numpy as np
 import pathlib
-
+import torch
 
 if __name__ == "__main__":
 	
@@ -26,10 +26,8 @@ if __name__ == "__main__":
 	img_name = img_path.split("/")[-1]
 
 	# --------------- #
-
+ 
 	class_names = [name.strip() for name in open(label_path).readlines()]
-	num_classes = len(class_names)
-	print(num_classes)
 	if net_type == 'vgg16-ssd':
 		net = create_vgg_ssd(len(class_names), is_test=True)
 	elif net_type == 'mb1-ssd':
@@ -37,7 +35,7 @@ if __name__ == "__main__":
 	elif net_type == 'mb1-ssd-lite':
 		net = create_mobilenetv1_ssd_lite(len(class_names), is_test=True)
 	elif net_type == 'mb2-ssd-lite':
-		net = create_mobilenetv2_ssd_lite(len(class_names), is_test=True)
+		net = create_mobilenetv2_ssd_lite(len(class_names), is_test=True, device='cpu')
 	else:
 		print("The net type is wrong. It should be one of vgg16-ssd, mb1-ssd and mb1-ssd-lite.")
 		sys.exit(1)
@@ -88,6 +86,8 @@ if __name__ == "__main__":
 					2)  # line type
 
 	print(orig_image.shape)
-	pathlib.Path('./outputs/').mkdir(exist_ok=True) 
-	cv2.imwrite('./outputs/' + img_name, orig_image)
+	dt = datetime.now() + timedelta(hours=8)
+	save_path = f'./outputs/img/{dt.date()}'
+	pathlib.Path(save_path).mkdir(parents=True, exist_ok=True) 
+	cv2.imwrite(f'{save_path}/{img_name}', orig_image)
 	print("Check the result!")

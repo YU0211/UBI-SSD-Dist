@@ -1,11 +1,10 @@
 import numpy as np
-import os, sys
+import os
 import re
 import math
-import random
 import cv2
 from tqdm import tqdm
-import time
+from datetime import datetime, timedelta
 from multiprocessing import Pool
 from rknn.api import RKNN
 
@@ -20,8 +19,9 @@ X_SCALE = 10.0
 H_SCALE = 5.0
 W_SCALE = 5.0
 
-RKNN_MODEL = './ssd_mobilenet_v1_coco.rknn'
-
+RKNN_MODEL = 'tf_rknn_data/ssd_mobilenet_v1_coco.rknn'
+TEST_IMGS = 'tf_rknn_data/test_imgs.npy'
+dt = datetime.now() + timedelta(hours=8)
 
 def expit(x):
     return 1. / (1. + math.exp(-x))
@@ -46,7 +46,7 @@ def CalculateOverlap(xmin0, ymin0, xmax0, ymax0, xmin1, ymin1, xmax1, ymax1):
 
 def load_box_priors():
     box_priors_ = []
-    fp = open('./box_priors.txt', 'r')
+    fp = open('tf_rknn_data/box_priors.txt', 'r')
     ls = fp.readlines()
     for s in ls:
         aList = re.findall('([-+]?\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', s)
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     # Set inputs
     print('--> Load file')
     all_class_name = []
-    with open(f'coco_labels_list.txt', 'r') as f:
+    with open(f'tf_rknn_data/coco_labels_list.txt', 'r') as f:
         for line in f.readlines():
             line = line.rstrip()
             if line in ['bus', 'car', 'truck']:
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         all_image_name = [line.rstrip() for line in f.readlines()]
 
     inputs = []
-    if os.path.exists('test_imgs.npy') == False:
+    if os.path.exists(TEST_IMGS) == False:
         for i in tqdm(all_image_name):
             path = os.path.join('../../Data/test/images', i + '.jpg')
             orig_img = cv2.imread(path)
@@ -107,9 +107,9 @@ if __name__ == '__main__':
             img = cv2.resize(img, (INPUT_SIZE, INPUT_SIZE),
                              interpolation=cv2.INTER_CUBIC)
             inputs.append(img)
-        np.save('test_imgs.npy', inputs)
+        np.save(TEST_IMGS, inputs)
     else:
-        inputs = np.load('test_imgs.npy')
+        inputs = np.load(TEST_IMGS)
     print('done')
     print(f'Totol images:{len(inputs)}')
     
@@ -233,7 +233,7 @@ if __name__ == '__main__':
             ymax = max(0.0, min(1.0, predictions[0][n][2])) * ORIG_IMG_SIZE[1]
             result = [all_image_name[img_id],
                       candidateProbs[0][i], xmin, ymin, xmax, ymax]
-            with open(f"../outputs/det_test_{cls}.txt", "a") as f:
+            with open(f"../outputs/{dt.date()}/det_test_{cls}.txt", "a") as f:
                 f.write(" ".join([str(r) for r in result]) + '\n')
 
     # Evaluate Perf on Simulator

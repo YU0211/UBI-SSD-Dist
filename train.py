@@ -4,7 +4,8 @@ import logging
 import sys
 import itertools
 from tqdm import tqdm
-import datetime
+from datetime import datetime, timedelta
+import pathlib
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
@@ -353,13 +354,15 @@ if __name__ == '__main__':
             f"Validation Regression Loss {val_regression_loss:.4f}, " +
             f"Validation Classification Loss: {val_classification_loss:.4f}"
         )
+        dt = datetime.now() + timedelta(hours=8)
+        Model_folder = f'{args.checkpoint_folder}/{dt.date()}' 
+        pathlib.Path(Model_folder).mkdir(exist_ok=True) 
         if val_loss < best_loss:
             best_loss = val_loss
             logging.info("====> Better weight saved!!")
-            model_path = os.path.join(args.checkpoint_folder, "best.pth")
-            net.save(model_path)
+            net.save(f'{Model_folder}/best.pth')
                 
-        model_path = os.path.join(args.checkpoint_folder, f"{args.net}-Epoch-{epoch}.pth")
+        model_path = os.path.join(Model_folder, f"{args.net}-Epoch-{epoch:04d}.pth")
         net.save(model_path)
         logging.info(f"Saved model {model_path}")
         
