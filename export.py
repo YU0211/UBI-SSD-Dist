@@ -96,7 +96,7 @@ def run(
 
     # Load PyTorch model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    device = 'cpu'
+    # device = 'cpu'
     logging.info(f"Device on {device}")
     
     assert not (device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'

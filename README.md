@@ -1,14 +1,17 @@
-# UBI_SSD with PyTorch
+# UBI SSD by PyTorch
 
 Object Detection with SSD on UBI Datasets.
 
-<!-- ## Results
+### Results
 1. Detection
 
-<img src="readme_images/detection_105e.jpg" width="1200">
--->
+<img src="outputs/img/2023-08-08/test_img.jpg" width="960">
 
-## Dependencies
+2. Training log
+
+<img src="train_log.png" width="480">
+
+### Dependencies
 - Python 3.8
 - OpenCV
 - numpy
@@ -18,13 +21,31 @@ Object Detection with SSD on UBI Datasets.
 - tqdm
 - rknntoolkit 1.7.3
 
-## Optional Model
+### Optional Model
 - Vgg16-SSD
 - MobileNet_V1-SSD
 - MobileNet_V1-SSDLite
 - MobileNet_V2-SSDLite
 
-## Usage
+### Dataset Path (optional)
+The dataset path should be structured as follow:
+```
+ubi
+  |- UBI_Dataset -- All data (voc format)
+  |            |- Annotations -- (.xml)
+  |            |- JPEGImages -- (.jpg)
+  |
+  |- Data -- Split UBI_Dataset into train, test & valid by 7:1:2
+  |
+  |- UBI_SSD -- Model
+                    |- Dataset
+                    |- models
+                    |- ...
+                    |- train.py
+                    |- ...
+```
+
+### Usage
 1. Get dataset
 ```bashrc
 mkdir ubi
@@ -41,33 +62,33 @@ git clone https://github.com/yue-723/UBI_SSD.git
 notebook: /UBI_SSD/Dataset/generate_Data.ipynb
 ```
 
-## Train
+### Train
 1. Train
 ```bashrc
-$ python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --batch_size 64 --num_epochs 200 --scheduler cosine --lr 0.01 --t_max 200
+python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --batch_size 64 --num_epochs 200 --scheduler cosine --lr 0.01 --t_max 200
 ```
 2. Train pretrained-model
 ```bashrc
-$ python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --pretrained_ssd models/${pretrained-model}.pth --batch_size 64 --num_epochs 200 --scheduler cosine --lr 0.01 --t_max 200
+python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --pretrained_ssd models/${pretrained-model}.pth --batch_size 64 --num_epochs 200 --scheduler cosine --lr 0.01 --t_max 200
 ```
 
-## Resume Training
+### Resume Training
 ```bashrc
-$ python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --resume models/${trained-model-name}.pth --batch_size 64 --num_epochs 200 --last_epoch ${last_epoch} --scheduler cosine --lr 0.001 --t_max 100 --debug_steps 10
+python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --resume models/${trained-model-name}.pth --batch_size 64 --num_epochs 200 --last_epoch ${last_epoch} --scheduler cosine --lr 0.001 --t_max 100 --debug_steps 10
 ```
 
-## Test
+### Test
 1. Test on image
 ```bashrc
-$ python test.py <IMG_PATH> <MODEL_WEIGHT_PATH> <MODEL_TYPE>
+python test.py <IMG_PATH> <MODEL_WEIGHT_PATH> <MODEL_TYPE>
 ```
 
-## Check on tensorboard
+### Check on tensorboard
 ```bashrc
 tensorboard --logdir runs
 ```
 
-## Example args
+### Example args
 
 1. Train pretrained-model
 ```bashrc
@@ -82,17 +103,21 @@ python train.py --datasets ../Data/train/ --validation_dataset ../Data/val/ --ne
 python test.py test_img.jpg /models/best.pth mb2-ssd-lite
 ```
 
-## Export model
+### Export model
 ```bashrc
 python export.py
 ```
 
-## Convert to .rknn model
+### Convert to .rknn model
 ```bashrc
 python convert2rknn.py
 ```
+### Todo & issue
+1. Customize logging
+2. Cosine scheduler when resume training
+3. MobileNet_V3-SSDLite
+4. Enhance rider & pedestrian detection
 
-## References
+### References
 - https://github.com/qfgaohao/pytorch-ssd
-- https://github.com/leeesangwon/bdd100k_to_VOC
 - https://github.com/tranleanh/mobilenets-ssd-pytorch

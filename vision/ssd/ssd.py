@@ -34,11 +34,12 @@ class SSD(nn.Module):
         if device:
             self.device = device
         else:
-            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            self.device = torch.device(
+                "cuda:0" if torch.cuda.is_available() else "cpu")
         if is_test:
             self.config = config
             self.priors = config.priors.to(self.device)
-            
+
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         confidences = []
         locations = []
@@ -88,7 +89,7 @@ class SSD(nn.Module):
 
         confidences = torch.cat(confidences, 1)
         locations = torch.cat(locations, 1)
-        
+
         if self.is_test:
             confidences = F.softmax(confidences, dim=2)
             boxes = box_utils.convert_locations_to_boxes(
@@ -111,39 +112,44 @@ class SSD(nn.Module):
         return confidence, location
 
     def init_from_base_net(self, model):
-        self.base_net.load_state_dict(torch.load(model, map_location=lambda storage, loc: storage), strict=True)
-        self.source_layer_add_ons.apply(_xavier_init_)
-        self.extras.apply(_xavier_init_)
-        self.classification_headers.apply(_xavier_init_)
-        self.regression_headers.apply(_xavier_init_)
+        self.base_net.load_state_dict(torch.load(
+            model, map_location=lambda storage, loc: storage), strict=True)
+        self.source_layer_add_ons.apply(_kaiming_init_)
+        self.extras.apply(_kaiming_init_)
+        self.classification_headers.apply(_kaiming_init_)
+        self.regression_headers.apply(_kaiming_init_)
 
     def init_from_pretrained_ssd(self, model):
-        
-        state_dict = torch.load(model, map_location=lambda storage, loc: storage)
-        state_dict = {k: v for k, v in state_dict.items() if not (k.startswith("classification_headers"))}
+
+        state_dict = torch.load(
+            model, map_location=lambda storage, loc: storage)
+        state_dict = {k: v for k, v in state_dict.items() if not (
+            k.startswith("classification_headers"))}
         model_dict = self.state_dict()
         model_dict.update(state_dict)
         self.load_state_dict(model_dict)
         self.classification_headers.apply(_kaiming_init_)
 
-
     def init(self):
-        self.base_net.apply(_xavier_init_)
-        self.source_layer_add_ons.apply(_xavier_init_)
-        self.extras.apply(_xavier_init_)
-        self.classification_headers.apply(_xavier_init_)
-        self.regression_headers.apply(_xavier_init_)
+        self.base_net.apply(_kaiming_init_)
+        self.source_layer_add_ons.apply(_kaiming_init_)
+        self.extras.apply(_kaiming_init_)
+        self.classification_headers.apply(_kaiming_init_)
+        self.regression_headers.apply(_kaiming_init_)
 
     def load(self, model):
-        self.load_state_dict(torch.load(model, map_location=lambda storage, loc: storage),False)
+        self.load_state_dict(torch.load(
+            model, map_location=lambda storage, loc: storage),  strict=False)
 
     def save(self, model_path):
         torch.save(self.state_dict(), model_path)
 
+
 class MatchPrior(object):
     def __init__(self, center_form_priors, center_variance, size_variance, iou_threshold):
         self.center_form_priors = center_form_priors
-        self.corner_form_priors = box_utils.center_form_to_corner_form(center_form_priors)
+        self.corner_form_priors = box_utils.center_form_to_corner_form(
+            center_form_priors)
         self.center_variance = center_variance
         self.size_variance = size_variance
         self.iou_threshold = iou_threshold
@@ -156,14 +162,16 @@ class MatchPrior(object):
         boxes, labels = box_utils.assign_priors(gt_boxes, gt_labels,
                                                 self.corner_form_priors, self.iou_threshold)
         boxes = box_utils.corner_form_to_center_form(boxes)
-        locations = box_utils.convert_boxes_to_locations(boxes, self.center_form_priors, self.center_variance, self.size_variance)
+        locations = box_utils.convert_boxes_to_locations(
+            boxes, self.center_form_priors, self.center_variance, self.size_variance)
         return locations, labels
 
 
 def _xavier_init_(m: nn.Module):
     if isinstance(m, nn.Conv2d):
         nn.init.xavier_uniform_(m.weight)
-        
+
+
 def _kaiming_init_(m: nn.Module):
     if isinstance(m, nn.Conv2d):
         nn.init.kaiming_uniform_(m.weight)

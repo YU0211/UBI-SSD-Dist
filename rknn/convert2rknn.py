@@ -2,16 +2,17 @@ import numpy as np
 import os
 import time
 import cv2
+from pathlib import Path
 
 from rknn.api import RKNN
 
 
-PT_MODEL = '../models/best.torchscript.pt'
+PT_MODEL = '/root/ubi/UBI_SSD/models/best.torchscript.pt'
 RKNN_MODEL = 'MobilenetV2_SSD_Lite.rknn'
-IMG_PATH = 'test.jpg'
+IMG_PATH = '/root/ubi/UBI_SSD/rknn/car mirror_2.jpg'
 DATASET = 'dataset.txt'
 
-ORIG_IMG_SIZE = (1920, 1080)
+ORIG_IMG_SIZE = (300, 300)
 INPUT_IMG_SIZE = (300, 300)
 CLASSES = ['BACKGROUND', 'vehicle', 'rider', 'pedestrian']
 QUANTIZE_ON = True
@@ -108,37 +109,39 @@ if __name__ == '__main__':
     rknn = RKNN()
     # Config for Model Input PreProcess
     print('--> Config model')
-    rknn.config(
-        target_platform='rv1126',
-        mean_values=[[127.5, 127.5, 127.5]],
-        std_values=[[127.5, 127.5, 127.5]],
-        reorder_channel='0 1 2')
+    target = 'rv1126'
+    device_id = None
+    rknn.config(mean_values=[[127.5, 127.5, 127.5]],
+                std_values=[[127.5, 127.5, 127.5]],
+                reorder_channel='0 1 2',
+                target_platform=[target])
     print('done')
 
-    # Load TensorFlow Model
-    print('--> Loading model')
-    ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[
-                            [3, INPUT_IMG_SIZE[1], INPUT_IMG_SIZE[0]]])
-    if ret != 0:
-        print('Load model failed!')
-        exit(ret)
-    print('done')
+    if not Path(RKNN_MODEL).exists():
+        # Load PyTorch Model
+        print('--> Loading model')
+        ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[
+                                [3, INPUT_IMG_SIZE[1], INPUT_IMG_SIZE[0]]])
+        if ret != 0:
+            print('Load model failed!')
+            exit(ret)
+        print('done')
 
-    # Build Model
-    print('--> Building model')
-    ret = rknn.build(do_quantization=QUANTIZE_ON, dataset=DATASET)
-    if ret != 0:
-        print('Build model failed!')
-        exit(ret)
-    print('done')
+        # Build Model
+        print('--> Building model')
+        ret = rknn.build(do_quantization=QUANTIZE_ON, dataset=DATASET)
+        if ret != 0:
+            print('Build model failed!')
+            exit(ret)
+        print('done')
 
-    # Export RKNN Model
-    print('--> Export RKNN model')
-    rknn.export_rknn(RKNN_MODEL)
-    if ret != 0:
-        print('Export RKNN model failed!')
-        exit(ret)
-    print('done')
+        # Export RKNN Model
+        print('--> Export RKNN model')
+        rknn.export_rknn(RKNN_MODEL)
+        if ret != 0:
+            print('Export RKNN model failed!')
+            exit(ret)
+        print('done')
 
     # Direct Load RKNN Model
     print('--> Load rknn model')
@@ -150,8 +153,9 @@ if __name__ == '__main__':
 
     # Set inputs
     orig_img = cv2.imread(IMG_PATH)
+    orig_img = cv2.resize(orig_img, INPUT_IMG_SIZE, interpolation=cv2.INTER_CUBIC)
     img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, INPUT_IMG_SIZE, interpolation=cv2.INTER_CUBIC)
+    
 
     # init runtime environment
     print('--> Init runtime environment')
@@ -185,16 +189,16 @@ if __name__ == '__main__':
         cv2.putText(orig_img, label,
                     (box[0] - 10, box[1] - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1,  # font scale
+                    0.5,  # font scale
                     color[i_color],
                     2)  # line type
 
     cv2.imwrite("out.jpg", orig_img)
 
     # Evaluate Perf on Simulator
-    print('--> Evaluate model performance')
-    rknn.eval_perf(inputs=[img], is_print=True)
-    print('done')
+    # print('--> Evaluate model performance')
+    # rknn.eval_perf(inputs=[img], is_print=True)
+    # print('done')
 
     # Release RKNN Context
     rknn.release()
