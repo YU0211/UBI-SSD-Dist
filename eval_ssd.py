@@ -16,7 +16,8 @@ from tqdm import tqdm
 from torchsummary import summary
 
 parser = argparse.ArgumentParser(description="SSD Evaluation on UBI Dataset.")
-parser.add_argument('--Skip_infer', action='store_true', help='Do not need to inferance')
+parser.add_argument('--Skip_infer', action='store_true',
+                    help='Do not need to inferance')
 parser.add_argument('--net', default="mb2-ssd-lite",
                     help="The network architecture, it should be of mb1-ssd, mb1-ssd-lite, mb2-ssd-lite or vgg16-ssd.")
 parser.add_argument("--trained_model", default="models/best.pth", type=str)
@@ -29,9 +30,9 @@ parser.add_argument("--label_file", type=str, help="The label file path.")
 parser.add_argument("--use_cuda", type=str2bool, default=True)
 parser.add_argument("--use_2007_metric", type=str2bool, default=False)
 parser.add_argument("--nms_method", type=str, default="hard")
-parser.add_argument("--iou_threshold", type=float, default=0.5,
+parser.add_argument("--iou_threshold", type=float, default=0.45,
                     help="The threshold of Intersection over Union.")
-parser.add_argument("--eval_dir", default="eval_results",
+parser.add_argument("--eval_dir", default="outputs/eval",
                     type=str, help="The directory to store evaluation results.")
 parser.add_argument('--mb2_width_mult', default=1.0, type=float,
                     help='Width Multiplifier for MobilenetV2')
@@ -146,15 +147,15 @@ if __name__ == '__main__':
     true_case_stat, all_gt_boxes, all_difficult_cases = group_annotation_by_class(
         dataset)
     print("---> Done")
-    
+
     if args.Skip_infer:
         print("\n---> Skip inferance")
         eval_path = pathlib.Path(args.eval_dir)
     else:
         dt = datetime.now() + timedelta(hours=8)
-        eval_path = pathlib.Path(f'{args.eval_dir}/{str(dt)}')   
+        eval_path = pathlib.Path(f'{args.eval_dir}/{str(dt)}')
         eval_path.mkdir(parents=True, exist_ok=True)
-        
+
         if args.net == 'vgg16-ssd':
             net = create_vgg_ssd(len(class_names), is_test=True)
         elif args.net == 'mb1-ssd':
@@ -172,7 +173,8 @@ if __name__ == '__main__':
         timer.start("Load Model")
         net.load(args.trained_model)
         net = net.to(DEVICE)
-        print(f'\nIt took {timer.end("Load Model")} seconds to load the model.\n')
+        print(
+            f'\nIt took {timer.end("Load Model")} seconds to load the model.\n')
         summary(net, input_size=(3, 300, 300))
         if args.net == 'vgg16-ssd':
             predictor = create_vgg_ssd_predictor(
@@ -210,7 +212,7 @@ if __name__ == '__main__':
                 ], dim=1))
         mean_infer_time = timer.end("Inference") / len(dataset)
         print("---> Done")
-        
+
         results = torch.cat(results)
         print("\n---> Save inference result")
         for class_index, class_name in enumerate(class_names):
@@ -249,6 +251,6 @@ if __name__ == '__main__':
 
     print(
         f"\nAverage Precision Across All Classes(mAP): {sum(aps)/len(aps):.4f}")
-    if not(args.Skip_infer):
+    if not (args.Skip_infer):
         print("Inference per image: {:.4f} seconds.".format(mean_infer_time))
     print()

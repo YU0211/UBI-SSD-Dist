@@ -5,11 +5,11 @@ Object Detection with SSD on UBI Datasets.
 ### Results
 1. Detection
 
-<img src="outputs/img/2023-08-08/test_img.jpg" width="960">
+<img src="readme_img/test_img.jpg" width="960">
 
 2. Training log
 
-<img src="train_log.png" width="480">
+<img src="readme_img/train_log.png" width="480">
 
 ### Dependencies
 - Python 3.8
@@ -103,14 +103,17 @@ python train.py --datasets ../Data/train/ --validation_dataset ../Data/val/ --ne
 ```
 3. Test
 ```bashrc
-python test.py test_img.jpg /models/best.pth mb2-ssd-lite
+python test.py test_img.jpg models/best.pth mb2-ssd-lite
 ```
 
 ### Export model
 ```bashrc
 python export.py
 ```
-
+### Evaluate model
+```bashrc
+python eval_ssd.py ../Data/test/
+```
 ### Convert to .rknn model
 ```bashrc
 python convert2rknn.py
