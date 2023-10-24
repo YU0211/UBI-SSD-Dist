@@ -30,8 +30,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--dataset_type", default="ubi", type=str,
                     help='Specify dataset type. Currently support voc and open_images.')
 
-parser.add_argument('--datasets', default=["../Data/train/"], nargs='+', help='Dataset directory path')
-parser.add_argument('--validation_dataset', default="../Data/val/", type=str, help='Dataset directory path')
+parser.add_argument(
+    '--datasets', default=["../Data/train/"], nargs='+', help='Dataset directory path')
+parser.add_argument('--validation_dataset', default="../Data/val/",
+                    type=str, help='Dataset directory path')
 parser.add_argument('--balance_data', action='store_true',
                     help="Balance training data by down-sampling more frequent labels.")
 
@@ -89,7 +91,7 @@ parser.add_argument('--batch_size', default=64, type=int,
                     help='Batch size for training')
 parser.add_argument('--num_epochs', default=200, type=int,
                     help='the number epochs')
-parser.add_argument('--num_workers', default=12, type=int,
+parser.add_argument('--num_workers', default=os.cpu_count(), type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--validation_epochs', default=5, type=int,
                     help='the number epochs')
@@ -101,9 +103,11 @@ parser.add_argument('--use_cuda', default=True, type=str2bool,
 parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
 
+
 def GMT_8(sec, what):
     GMT_8_time = datetime.now() + timedelta(hours=8)
     return GMT_8_time.timetuple()
+
 
 logging.Formatter.converter = GMT_8
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
@@ -118,6 +122,7 @@ if args.use_cuda and torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
     logging.info("Use Cuda.")
 
+
 def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100, epoch=0):
     net.train(True)
     running_loss = 0.0
@@ -128,7 +133,7 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
     total_loss = 0.0
     total_regression_loss = 0.0
     total_classification_loss = 0.0
-    
+
     n_iter = 0
 
     for i, data in tqdm(enumerate(loader), total=len(loader)):
@@ -139,18 +144,19 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
         labels = labels.to(device)
         optimizer.zero_grad()
         confidence, locations = net(images)
-        regression_loss, classification_loss = criterion(confidence, locations, labels, boxes)  # TODO CHANGE BOXES
+        regression_loss, classification_loss = criterion(
+            confidence, locations, labels, boxes)  # TODO CHANGE BOXES
         loss = regression_loss + classification_loss
         loss.backward()
         # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5, norm_type=2.0, error_if_nonfinite=False)
         optimizer.step()
         scheduler.step()
-        
+
         n_iter += 1
         running_loss += loss.item()
         running_regression_loss += regression_loss.item()
         running_classification_loss += classification_loss.item()
-        
+
         total_loss += loss.item()
         total_regression_loss += regression_loss.item()
         total_classification_loss += classification_loss.item()
@@ -168,9 +174,9 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
             running_loss = 0.0
             running_regression_loss = 0.0
             running_classification_loss = 0.0
-            
+
     return total_loss / n_iter, total_regression_loss / n_iter, total_classification_loss / n_iter
-    
+
 
 def test(loader, net, criterion, device):
     net.eval()
@@ -187,7 +193,8 @@ def test(loader, net, criterion, device):
 
         with torch.no_grad():
             confidence, locations = net(images)
-            regression_loss, classification_loss = criterion(confidence, locations, labels, boxes)
+            regression_loss, classification_loss = criterion(
+                confidence, locations, labels, boxes)
             loss = regression_loss + classification_loss
 
         total_loss += loss.item()
@@ -195,10 +202,11 @@ def test(loader, net, criterion, device):
         total_classification_loss += classification_loss.item()
     return total_loss / num, total_regression_loss / num, total_classification_loss / num
 
+
 if __name__ == '__main__':
     timer = Timer()
     logging.info(args)
-    
+
     if args.net == 'vgg16-ssd':
         create_net = create_vgg_ssd
         config = vgg_ssd_config
@@ -209,29 +217,34 @@ if __name__ == '__main__':
         create_net = create_mobilenetv1_ssd_lite
         config = mobilenetv1_ssd_config
     elif args.net == 'mb2-ssd-lite':
-        create_net = lambda num: create_mobilenetv2_ssd_lite(num, width_mult=args.mb2_width_mult)
+        def create_net(num): return create_mobilenetv2_ssd_lite(
+            num, width_mult=args.mb2_width_mult)
         config = mobilenetv1_ssd_config
     else:
         logging.fatal("The net type is wrong.")
         parser.print_help(sys.stderr)
         sys.exit(1)
-    train_transform = TrainAugmentation(config.image_size, config.image_mean, config.image_std)
+    train_transform = TrainAugmentation(
+        config.image_size, config.image_mean, config.image_std)
     target_transform = MatchPrior(config.priors, config.center_variance,
                                   config.size_variance, 0.5)
 
-    test_transform = TestTransform(config.image_size, config.image_mean, config.image_std)
+    test_transform = TestTransform(
+        config.image_size, config.image_mean, config.image_std)
 
     logging.info("Prepare training datasets.")
     datasets = []
     for dataset_path in args.datasets:
         if args.dataset_type == 'ubi':
             dataset = UBI_Dataset(dataset_path, transform=train_transform,
-                                 target_transform=target_transform, dataset_type="train")
-            label_file = os.path.join(args.checkpoint_folder, "ubi-model-labels.txt")
+                                  target_transform=target_transform, dataset_type="train")
+            label_file = os.path.join(
+                args.checkpoint_folder, "ubi-model-labels.txt")
             store_labels(label_file, dataset.class_names)
             num_classes = len(dataset.class_names)
         else:
-            raise ValueError(f"Dataset type {args.dataset_type} is not supported.")
+            raise ValueError(
+                f"Dataset type {args.dataset_type} is not supported.")
         datasets.append(dataset)
     logging.info(f"Stored labels into file {label_file}.")
     train_dataset = ConcatDataset(datasets)
@@ -242,7 +255,7 @@ if __name__ == '__main__':
     logging.info("Prepare Validation datasets.")
     if args.dataset_type == "ubi":
         val_dataset = UBI_Dataset(args.validation_dataset, transform=test_transform,
-                                 target_transform=target_transform, dataset_type="val")
+                                  target_transform=target_transform, dataset_type="val")
         logging.info(val_dataset)
     logging.info("validation dataset size: {}".format(len(val_dataset)))
 
@@ -275,7 +288,8 @@ if __name__ == '__main__':
         freeze_net_layers(net.base_net)
         freeze_net_layers(net.source_layer_add_ons)
         freeze_net_layers(net.extras)
-        params = itertools.chain(net.regression_headers.parameters(), net.classification_headers.parameters())
+        params = itertools.chain(
+            net.regression_headers.parameters(), net.classification_headers.parameters())
         logging.info("Freeze all the layers except prediction heads.")
     else:
         params = [
@@ -300,7 +314,8 @@ if __name__ == '__main__':
     elif args.pretrained_ssd:
         logging.info(f"Init from pretrained ssd {args.pretrained_ssd}")
         net.init_from_pretrained_ssd(args.pretrained_ssd)
-    logging.info(f'Took {timer.end("Load Model"):.2f} seconds to load the model.')
+    logging.info(
+        f'Took {timer.end("Load Model"):.2f} seconds to load the model.')
 
     net.to(DEVICE)
 
@@ -315,7 +330,7 @@ if __name__ == '__main__':
         logging.info("Uses MultiStepLR scheduler.")
         milestones = [int(v.strip()) for v in args.milestones.split(",")]
         scheduler = MultiStepLR(optimizer, milestones=milestones,
-                                                     gamma=0.1, last_epoch=-1)
+                                gamma=0.1, last_epoch=-1)
     elif args.scheduler == 'cosine':
         logging.info("Uses CosineAnnealingLR scheduler.")
         scheduler = CosineAnnealingLR(optimizer, args.t_max, last_epoch=-1)
@@ -329,11 +344,12 @@ if __name__ == '__main__':
     best_epoch_at = 0
     writer = SummaryWriter(log_dir=args.log_dir)
     for epoch in range(last_epoch + 1, args.num_epochs):
-       
+
         train_loss, train_regression_loss, train_classification_loss = train(
-            train_loader, net, criterion, optimizer,scheduler,device=DEVICE, debug_steps=args.debug_steps, epoch=epoch)
-        
-        val_loss, val_regression_loss, val_classification_loss = test(val_loader, net, criterion, DEVICE)
+            train_loader, net, criterion, optimizer, scheduler, device=DEVICE, debug_steps=args.debug_steps, epoch=epoch)
+
+        val_loss, val_regression_loss, val_classification_loss = test(
+            val_loader, net, criterion, DEVICE)
         # logging into tensorboard
         writer.add_scalars('Total Loss', {
             'Training': train_loss,
@@ -347,7 +363,7 @@ if __name__ == '__main__':
             'Training': train_classification_loss,
             'Validation': val_classification_loss,
         }, epoch)
-    
+
         logging.info(
             f"Epoch: {epoch}, " +
             f"Validation Loss: {val_loss:.4f}, " +
@@ -355,19 +371,20 @@ if __name__ == '__main__':
             f"Validation Classification Loss: {val_classification_loss:.4f}"
         )
         dt = datetime.now() + timedelta(hours=8)
-        Model_folder = f'{args.checkpoint_folder}/{dt.date()}' 
-        pathlib.Path(Model_folder).mkdir(exist_ok=True) 
+        Model_folder = f'{args.checkpoint_folder}/{dt.date()}'
+        pathlib.Path(Model_folder).mkdir(exist_ok=True)
         if val_loss < best_loss:
             best_loss = val_loss
             logging.info("---> Better weight saved!!")
             best_epoch_at = epoch
             net.save(f'{Model_folder}/best.pth')
-                
-        model_path = os.path.join(Model_folder, f"{args.net}-Epoch-{epoch:04d}.pth")
+
+        model_path = os.path.join(
+            Model_folder, f"{args.net}-Epoch-{epoch:04d}.pth")
         net.save(model_path)
         logging.info(f"---> Saved model {model_path}")
-        
-    logging.info(f"Finish training!! Best model at Epoch-{best_epoch_at} Loss: {best_loss}")
-    writer.add_graph(net.to(DEVICE), torch.randn(1,3,300,300).to(DEVICE))
-    writer.close()
 
+    logging.info(
+        f"Finish training!! Best model at Epoch-{best_epoch_at} Loss: {best_loss}")
+    writer.add_graph(net.to(DEVICE), torch.randn(1, 3, 300, 300).to(DEVICE))
+    writer.close()

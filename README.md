@@ -27,7 +27,7 @@ Object Detection with SSD on UBI Datasets.
 - MobileNet_V1-SSDLite
 - MobileNet_V2-SSDLite
 
-### Dataset Path (optional)
+### Dataset Path
 The dataset path should be structured as follow:
 ```
 ubi
@@ -71,7 +71,10 @@ python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> -
 ```bashrc
 python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --pretrained_ssd models/${pretrained-model}.pth --batch_size 64 --num_epochs 200 --scheduler cosine --lr 0.01 --t_max 200
 ```
-
+3. Simply run `train.sh`
+```bashrc
+./train.sh
+```
 ### Resume Training
 ```bashrc
 python train.py --datasets <DATASET_PATH> --validation_dataset <VALIDSET_PATH> --net <NET_TYPE> --resume models/${trained-model-name}.pth --batch_size 64 --num_epochs 200 --last_epoch ${last_epoch} --scheduler cosine --lr 0.001 --t_max 100 --debug_steps 10
@@ -113,10 +116,11 @@ python export.py
 python convert2rknn.py
 ```
 ### Todo & issue
-1. Customize logging
-2. Cosine scheduler when resume training
-3. MobileNet_V3-SSDLite
-4. Enhance rider & pedestrian detection
+1. Modify dataloader to increase efficiency
+2. MobileNet_V3-SSDLite
+3. Enhance rider & pedestrian detection
+4. Cosine scheduler when resume training
+5. Customize logging
 
 ### References
 - https://github.com/qfgaohao/pytorch-ssd
