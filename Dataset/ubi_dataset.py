@@ -4,7 +4,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 import cv2
 import os
-
+import json
 
 class UBI_Dataset:
     def __init__(self, root, transform=None, target_transform=None, dataset_type='train', keep_difficult=False):
@@ -21,8 +21,13 @@ class UBI_Dataset:
         self.dataset_type = dataset_type
         self.image_sets_file = os.path.join(
             self.datapath, f'{dataset_type}.txt')
+        self.anno_sets_file = os.path.join(
+            self.datapath, f'{dataset_type}.json')
+
 
         self.ids = UBI_Dataset._read_image_ids(self.image_sets_file)
+        self.annos = UBI_Dataset._read_anno_info(self.anno_sets_file)
+
         self.keep_difficult = keep_difficult
 
         # label_file = os.path.join(os.getcwd(), 'models/voc-labels.txt')
@@ -86,43 +91,23 @@ class UBI_Dataset:
                 ids.append(line.rstrip())
         return ids
 
+    @staticmethod
+    def _read_anno_info(anno_sets_file):
+        with open(anno_sets_file) as f:
+            annos = json.load(f)
+        return annos
+
     def _get_annotation(self, image_id):
 
-        annotation_file = os.path.join(
-            self.datapath, "labels", f"{image_id}.xml")
+        # anno = list(
+        #     filter(lambda item: item["filename"] == image_id, self.annos))
 
-        objects = ET.parse(annotation_file).findall("object")
+        anno = next(
+            item for item in self.annos if item["filename"] == image_id)
 
-        boxes = []
-        labels = []
-        is_difficult = []
-        for obj in objects:
-            class_name = obj.find('name').text.lower().strip()
-            # we're only concerned with clases in our list
-            if class_name in self.class_dict:
-                bbox = obj.find('bndbox')
-
-                # VOC dataset format follows Matlab, in which indexes start from 0
-                x1 = float(bbox.find('xmin').text) - 1
-                y1 = float(bbox.find('ymin').text) - 1
-                x2 = float(bbox.find('xmax').text) - 1
-                y2 = float(bbox.find('ymax').text) - 1
-
-                if x1 > x2:
-                    x1, x2 = x2, x1
-                if y1 > y2:
-                    y1, y2 = y2, y1
-
-                boxes.append([x1, y1, x2, y2])
-
-                labels.append(self.class_dict[class_name])
-
-                is_difficult.append(
-                    int(obj.find('difficult').text) if obj.find('difficult') else 0)
-
-        return (np.array(boxes, dtype=np.float32),
-                np.array(labels, dtype=np.int64),
-                np.array(is_difficult, dtype=np.uint8))
+        return (np.array(anno["boxes"], dtype=np.float32),
+                np.array(anno["labels"], dtype=np.int64),
+                np.array(anno["is_difficult"], dtype=np.uint8))
 
     def _read_image(self, image_id):
 

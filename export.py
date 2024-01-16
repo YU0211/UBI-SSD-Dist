@@ -1,12 +1,12 @@
 import os
 import sys
 import argparse
-import logging
+import logger
 import datetime
 from tqdm import tqdm
 import torch
 from torch.utils.mobile_optimizer import optimize_for_mobile
-from vision.ssd.ssd import MatchPrior
+from vision.utils.logger import init_logger
 from vision.ssd.vgg_ssd import create_vgg_ssd
 from vision.ssd.mobilenetv1_ssd import create_mobilenetv1_ssd
 from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
@@ -15,15 +15,18 @@ import time
 from pathlib import Path
 import numpy as np
 
+
 def compute_file_size(file):
     return Path(file).stat().st_size / 1e6
-    
+
+
 def export_torchscript(model, img, file, optimize):
     # TorchScript model export
     prefix = 'TorchScript:'
     try:
         print(f'\n{prefix} starting export with torch {torch.__version__}...')
-        f = str(file.with_suffix('.torchscript_optim.pt' if optimize else '.torchscript.pt'))
+        f = str(file.with_suffix(
+            '.torchscript_optim.pt' if optimize else '.torchscript.pt'))
         ts = torch.jit.trace(model, img, strict=False)
         (optimize_for_mobile(ts) if optimize else ts).save(f)
         print(f'{prefix} export success, saved as {f} ({compute_file_size(f):.1f} MB)')
@@ -82,13 +85,13 @@ def run(
         img_size=(300, 300),  # image (height, width)
         batch_size=1,  # batch size
         include=('torchscript', 'onnx'),  # include formats
-        half=False,  # FP16 half-precision export
+        half=True,  # FP16 half-precision export
         train=False,  # model.train() mode
         optimize=False,  # TorchScript: optimize for mobile
         # dynamic=False,  # ONNX: dynamic axes
         # simplify=False,  # ONNX: simplify model
         # opset=12,  # ONNX: opset version
-        ):
+):
     t = time.time()
     include = [x.lower() for x in include]
     img_size *= 2 if len(img_size) == 1 else 1  # expand
@@ -97,10 +100,11 @@ def run(
     # Load PyTorch model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = 'cpu'
-    logging.info(f"Device on {device}")
-    
-    assert not (device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
-    
+    logger.info(f"Device on {device}")
+
+    assert not (
+        device.type == 'cpu' and half), '--half only compatible with GPU export, i.e. use --device 0'
+
     label_path = "models/ubi-model-labels.txt"
 
     class_names = [name.strip() for name in open(label_path).readlines()]
@@ -112,19 +116,23 @@ def run(
     elif net_type == 'mb2-ssd-lite':
         model = create_mobilenetv2_ssd_lite(len(class_names), is_test=True)
     else:
-        logging.fatal("The net type is wrong. It should be one of vgg16-ssd, mb1-ssd and mb1-ssd-lite.")
+        logger.fatal(
+            "The net type is wrong. It should be one of vgg16-ssd, mb1-ssd and mb1-ssd-lite.")
         sys.exit(1)
 
-    logging.info(f"PyTorch: loading model {net_type} from {weight} ({compute_file_size(weight):.1f} MB)")
+    logger.info(
+        f"PyTorch: loading model {net_type} from {weight} ({compute_file_size(weight):.1f} MB)")
     model.load(weight)
     model.to(device)
     # Input
-    img = torch.zeros(batch_size, 3, *img_size).to(device)  # image size(1,3,320,192) iDetection
+    # image size(1,3,320,192) iDetection
+    img = torch.zeros(batch_size, 3, *img_size).to(device)
 
     # Update model
     if half:
         img, model = img.half(), model.half()  # to FP16
-    model.train() if train else model.eval()  # training mode = no Detect() layer grid construction
+    # training mode = no Detect() layer grid construction
+    model.train() if train else model.eval()
 
     # for _ in range(2):
     #     y = model(img)  # dry runs
@@ -144,29 +152,38 @@ def run(
 def parse_opt():
     parser = argparse.ArgumentParser(description='Export SSD model')
     parser.add_argument('--net_type', default="mb2-ssd-lite",
-                    help="The network architecture, it can be mb1-ssd, mb2-ssd-lite or vgg16-ssd.")
-    parser.add_argument('--weight', type=str, default='./models/best.pth', help='weight path')
+                        help="The network architecture, it can be mb1-ssd, mb2-ssd-lite or vgg16-ssd.")
+    parser.add_argument('--weight', type=str,
+                        default='./models/best.pth', help='weight path')
     # parser.add_argument('--img_size', nargs='+', type=int, default=[300, 300], help='image (height, width)') only 300*300
     parser.add_argument('--batch_size', type=int, default=1, help='batch size')
-    parser.add_argument('--include', nargs='+', default=['torchscript', 'onnx', 'coreml'], help='include formats')
-    parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
-    parser.add_argument('--train', action='store_true', help='model.train() mode')
-    parser.add_argument('--optimize', action='store_true', help='TorchScript: optimize for mobile')
+    parser.add_argument('--include', nargs='+',
+                        default=['torchscript', 'onnx', 'coreml'], help='include formats')
+    parser.add_argument('--half', action='store_true',
+                        help='FP16 half-precision export')
+    parser.add_argument('--train', action='store_true',
+                        help='model.train() mode')
+    parser.add_argument('--optimize', action='store_true',
+                        help='TorchScript: optimize for mobile')
     # parser.add_argument('--dynamic', action='store_true', help='ONNX: dynamic axes')
     # parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
     # parser.add_argument('--opset', type=int, default=13, help='ONNX: opset version')
     return parser.parse_args()
 
+
 def GMT_8(sec, what):
     GMT_8_time = datetime.datetime.now() + datetime.timedelta(hours=8)
     return GMT_8_time.timetuple()
 
+
 if __name__ == "__main__":
     opt = parse_opt()
-    
-    logging.Formatter.converter = GMT_8
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logging.info('export: ' + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
+
+    logger = init_logger()
+    logger.Formatter.converter = GMT_8
+    logger.basicConfig(stream=sys.stdout, level=logger.INFO,
+                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger.info(
+        'export: ' + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
 
     run(**vars(opt))

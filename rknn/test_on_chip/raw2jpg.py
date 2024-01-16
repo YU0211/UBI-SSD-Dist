@@ -1,4 +1,3 @@
-
 import sys
 from os.path import isfile
 import numpy as np
@@ -27,7 +26,8 @@ def get_raw_image_info(raw_image: bytes) -> tuple:
 
 def resolve_channels_order(raw_image_height: int, raw_image_width: int, raw_image: bytes) -> np.array:
 
-    image = np.zeros(shape=[raw_image_height, raw_image_width, 3], dtype=np.uint8)
+    image = np.zeros(
+        shape=[raw_image_height, raw_image_width, 3], dtype=np.uint8)
 
     # (RGB)^n
     for i in range(raw_image_height):
@@ -37,7 +37,8 @@ def resolve_channels_order(raw_image_height: int, raw_image_width: int, raw_imag
                     image[i][j][k] = raw_image[i*raw_image_width*3 + j*3 + k]
 
                 except IndexError as e:
-                    print('IndexError at ({}, {}, {}) during resolving raw image.'.format(j, i, k))
+                    print(
+                        'IndexError at ({}, {}, {}) during resolving raw image.'.format(j, i, k))
                     print(e)
                     exit(1)
 
@@ -46,17 +47,20 @@ def resolve_channels_order(raw_image_height: int, raw_image_width: int, raw_imag
 
 def resolve_mono_channel_order(raw_image_height: int, raw_image_width: int, raw_image: bytes) -> np.array:
 
-    image = np.zeros(shape=[raw_image_height, raw_image_width, 3], dtype=np.uint8)
+    image = np.zeros(
+        shape=[raw_image_height, raw_image_width, 3], dtype=np.uint8)
 
     # (R)^n  (G)^n  (B)^n
     for i in range(3):
         for j in range(raw_image_height):
             for k in range(raw_image_width):
                 try:
-                    image[j][k][i] = raw_image[i*raw_image_width*raw_image_height + j*raw_image_width + k]
-                
+                    image[j][k][i] = raw_image[i*raw_image_width *
+                                               raw_image_height + j*raw_image_width + k]
+
                 except IndexError as e:
-                    print('IndexError at ({}, {}, {}) during resolving raw image.'.format(j, k, i))
+                    print(
+                        'IndexError at ({}, {}, {}) during resolving raw image.'.format(j, k, i))
                     print(e)
                     exit(1)
 
@@ -64,9 +68,8 @@ def resolve_mono_channel_order(raw_image_height: int, raw_image_width: int, raw_
 
 
 def write_image(image: np.array, filename: str) -> bool:
-    
-    return cv2.imwrite(filename, image)
 
+    return cv2.imwrite(filename, image)
 
 
 if __name__ == '__main__' and len(sys.argv) >= 2:
@@ -78,12 +81,14 @@ if __name__ == '__main__' and len(sys.argv) >= 2:
         print('Image Loaded.')
 
         (raw_image_height, raw_image_width) = get_raw_image_info(raw_image)
-        print('Image Size: (w = {}, h = {})'.format(raw_image_width, raw_image_height))
-        
+        print('Image Size: (w = {}, h = {})'.format(
+            raw_image_width, raw_image_height))
+
         if output_filename.endswith('.raw'):
             output_filename = output_filename[0:-4] + '.jpg'
 
-        write_image(resolve_channels_order(raw_image_height, raw_image_width, raw_image), output_filename)
+        write_image(resolve_channels_order(raw_image_height,
+                    raw_image_width, raw_image), output_filename)
         print('Done resolving.')
 
     else:

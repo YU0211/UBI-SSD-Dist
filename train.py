@@ -1,6 +1,5 @@
 import os
 import argparse
-import logging
 import sys
 import itertools
 from tqdm import tqdm
@@ -13,13 +12,15 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, MultiStepLR
 from torch.utils.tensorboard import SummaryWriter
 
 from vision.utils.misc import str2bool, Timer, freeze_net_layers, store_labels
+from vision.utils.multibox_loss import MultiboxLoss
+from vision.utils.logger import init_logger
 from vision.ssd.ssd import MatchPrior
 from vision.ssd.vgg_ssd import create_vgg_ssd
 from vision.ssd.mobilenetv1_ssd import create_mobilenetv1_ssd
 from vision.ssd.mobilenetv1_ssd_lite import create_mobilenetv1_ssd_lite
 from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
 from Dataset.ubi_dataset import UBI_Dataset
-from vision.utils.multibox_loss import MultiboxLoss
+
 from vision.ssd.config import vgg_ssd_config
 from vision.ssd.config import mobilenetv1_ssd_config
 from vision.ssd.data_preprocessing import TrainAugmentation, TestTransform
@@ -104,14 +105,7 @@ parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
 
 
-def GMT_8(sec, what):
-    GMT_8_time = datetime.now() + timedelta(hours=8)
-    return GMT_8_time.timetuple()
-
-
-logging.Formatter.converter = GMT_8
-logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = init_logger()
 
 args = parser.parse_args()
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -120,7 +114,7 @@ print(DEVICE)
 
 if args.use_cuda and torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
-    logging.info("Use Cuda.")
+    logger.info("Use Cuda.")
 
 
 def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100, epoch=0):
@@ -165,7 +159,7 @@ def train(loader, net, criterion, optimizer, scheduler, device, debug_steps=100,
             avg_loss = running_loss / debug_steps
             avg_reg_loss = running_regression_loss / debug_steps
             avg_clf_loss = running_classification_loss / debug_steps
-            logging.info(
+            logger.info(
                 f"Epoch: {epoch}, Step: {i}, " +
                 f"Average Loss: {avg_loss:.4f}, " +
                 f"Average Regression Loss {avg_reg_loss:.4f}, " +
@@ -205,7 +199,7 @@ def test(loader, net, criterion, device):
 
 if __name__ == '__main__':
     timer = Timer()
-    logging.info(args)
+    logger.info(args)
 
     if args.net == 'vgg16-ssd':
         create_net = create_vgg_ssd
@@ -221,7 +215,7 @@ if __name__ == '__main__':
             num, width_mult=args.mb2_width_mult)
         config = mobilenetv1_ssd_config
     else:
-        logging.fatal("The net type is wrong.")
+        logger.fatal("The net type is wrong.")
         parser.print_help(sys.stderr)
         sys.exit(1)
     train_transform = TrainAugmentation(
@@ -232,7 +226,7 @@ if __name__ == '__main__':
     test_transform = TestTransform(
         config.image_size, config.image_mean, config.image_std)
 
-    logging.info("Prepare training datasets.")
+    logger.info("Prepare training datasets.")
     datasets = []
     for dataset_path in args.datasets:
         if args.dataset_type == 'ubi':
@@ -246,23 +240,23 @@ if __name__ == '__main__':
             raise ValueError(
                 f"Dataset type {args.dataset_type} is not supported.")
         datasets.append(dataset)
-    logging.info(f"Stored labels into file {label_file}.")
+    logger.info(f"Stored labels into file {label_file}.")
     train_dataset = ConcatDataset(datasets)
-    logging.info("Train dataset size: {}".format(len(train_dataset)))
+    logger.info("Train dataset size: {}".format(len(train_dataset)))
     train_loader = DataLoader(train_dataset, args.batch_size,
                               num_workers=args.num_workers,
                               shuffle=True)
-    logging.info("Prepare Validation datasets.")
+    logger.info("Prepare Validation datasets.")
     if args.dataset_type == "ubi":
         val_dataset = UBI_Dataset(args.validation_dataset, transform=test_transform,
                                   target_transform=target_transform, dataset_type="val")
-        logging.info(val_dataset)
-    logging.info("validation dataset size: {}".format(len(val_dataset)))
+        logger.info(val_dataset)
+    logger.info("validation dataset size: {}".format(len(val_dataset)))
 
     val_loader = DataLoader(val_dataset, args.batch_size,
                             num_workers=args.num_workers,
                             shuffle=False)
-    logging.info("Build network.")
+    logger.info("Build network.")
     net = create_net(num_classes)
     min_loss = np.finfo(np.float32).min
     last_epoch = args.last_epoch
@@ -270,7 +264,7 @@ if __name__ == '__main__':
     base_net_lr = args.base_net_lr if args.base_net_lr is not None else args.lr
     extra_layers_lr = args.extra_layers_lr if args.extra_layers_lr is not None else args.lr
     if args.freeze_base_net:
-        logging.info("Freeze base net.")
+        logger.info("Freeze base net.")
         freeze_net_layers(net.base_net)
         params = itertools.chain(net.source_layer_add_ons.parameters(), net.extras.parameters(),
                                  net.regression_headers.parameters(), net.classification_headers.parameters())
@@ -290,7 +284,7 @@ if __name__ == '__main__':
         freeze_net_layers(net.extras)
         params = itertools.chain(
             net.regression_headers.parameters(), net.classification_headers.parameters())
-        logging.info("Freeze all the layers except prediction heads.")
+        logger.info("Freeze all the layers except prediction heads.")
     else:
         params = [
             {'params': net.base_net.parameters(), 'lr': base_net_lr},
@@ -306,15 +300,15 @@ if __name__ == '__main__':
 
     timer.start("Load Model")
     if args.resume:
-        logging.info(f"Resume from the model {args.resume}")
+        logger.info(f"Resume from the model {args.resume}")
         net.load(args.resume)
     elif args.base_net:
-        logging.info(f"Init from base net {args.base_net}")
+        logger.info(f"Init from base net {args.base_net}")
         net.init_from_base_net(args.base_net)
     elif args.pretrained_ssd:
-        logging.info(f"Init from pretrained ssd {args.pretrained_ssd}")
+        logger.info(f"Init from pretrained ssd {args.pretrained_ssd}")
         net.init_from_pretrained_ssd(args.pretrained_ssd)
-    logging.info(
+    logger.info(
         f'Took {timer.end("Load Model"):.2f} seconds to load the model.')
 
     net.to(DEVICE)
@@ -323,23 +317,23 @@ if __name__ == '__main__':
                              center_variance=0.1, size_variance=0.2, device=DEVICE)
     optimizer = torch.optim.SGD(params, lr=args.lr, momentum=args.momentum,
                                 weight_decay=args.weight_decay)
-    logging.info(f"Learning rate: {args.lr}, Base net learning rate: {base_net_lr}, "
+    logger.info(f"Learning rate: {args.lr}, Base net learning rate: {base_net_lr}, "
                  + f"Extra Layers learning rate: {extra_layers_lr}.")
 
     if args.scheduler == 'multi-step':
-        logging.info("Uses MultiStepLR scheduler.")
+        logger.info("Uses MultiStepLR scheduler.")
         milestones = [int(v.strip()) for v in args.milestones.split(",")]
         scheduler = MultiStepLR(optimizer, milestones=milestones,
                                 gamma=0.1, last_epoch=-1)
     elif args.scheduler == 'cosine':
-        logging.info("Uses CosineAnnealingLR scheduler.")
+        logger.info("Uses CosineAnnealingLR scheduler.")
         scheduler = CosineAnnealingLR(optimizer, args.t_max, last_epoch=-1)
     else:
-        logging.fatal(f"Unsupported Scheduler: {args.scheduler}.")
+        logger.fatal(f"Unsupported Scheduler: {args.scheduler}.")
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    logging.info(f"Start training from epoch {last_epoch + 1}.")
+    logger.info(f"Start training from epoch {last_epoch + 1}.")
     best_loss = np.finfo(np.float32).max
     best_epoch_at = 0
     writer = SummaryWriter(log_dir=args.log_dir)
@@ -350,7 +344,7 @@ if __name__ == '__main__':
 
         val_loss, val_regression_loss, val_classification_loss = test(
             val_loader, net, criterion, DEVICE)
-        # logging into tensorboard
+        # logger into tensorboard
         writer.add_scalars('Total Loss', {
             'Training': train_loss,
             'Validation': val_loss,
@@ -364,7 +358,7 @@ if __name__ == '__main__':
             'Validation': val_classification_loss,
         }, epoch)
 
-        logging.info(
+        logger.info(
             f"Epoch: {epoch}, " +
             f"Validation Loss: {val_loss:.4f}, " +
             f"Validation Regression Loss {val_regression_loss:.4f}, " +
@@ -375,16 +369,16 @@ if __name__ == '__main__':
         pathlib.Path(Model_folder).mkdir(exist_ok=True)
         if val_loss < best_loss:
             best_loss = val_loss
-            logging.info("---> Better weight saved!!")
+            logger.info("---> Better weight saved!!")
             best_epoch_at = epoch
             net.save(f'{Model_folder}/best.pth')
 
         model_path = os.path.join(
             Model_folder, f"{args.net}-Epoch-{epoch:04d}.pth")
         net.save(model_path)
-        logging.info(f"---> Saved model {model_path}")
+        logger.info(f"---> Saved model {model_path}")
 
-    logging.info(
+    logger.info(
         f"Finish training!! Best model at Epoch-{best_epoch_at} Loss: {best_loss}")
     writer.add_graph(net.to(DEVICE), torch.randn(1, 3, 300, 300).to(DEVICE))
     writer.close()

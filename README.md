@@ -119,11 +119,9 @@ python eval_ssd.py ../Data/test/
 python convert2rknn.py
 ```
 ### Todo & issue
-1. Modify dataloader to increase efficiency
+1. Cosine scheduler when resume training
 2. MobileNet_V3-SSDLite
 3. Enhance rider & pedestrian detection
-4. Cosine scheduler when resume training
-5. Customize logging
 
 ### References
 - https://github.com/qfgaohao/pytorch-ssd

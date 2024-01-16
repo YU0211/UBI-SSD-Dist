@@ -153,9 +153,9 @@ if __name__ == '__main__':
 
     # Set inputs
     orig_img = cv2.imread(IMG_PATH)
-    orig_img = cv2.resize(orig_img, INPUT_IMG_SIZE, interpolation=cv2.INTER_CUBIC)
+    orig_img = cv2.resize(orig_img, INPUT_IMG_SIZE,
+                          interpolation=cv2.INTER_CUBIC)
     img = cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB)
-    
 
     # init runtime environment
     print('--> Init runtime environment')
@@ -196,9 +196,9 @@ if __name__ == '__main__':
     cv2.imwrite("out.jpg", orig_img)
 
     # Evaluate Perf on Simulator
-    # print('--> Evaluate model performance')
-    # rknn.eval_perf(inputs=[img], is_print=True)
-    # print('done')
+    print('--> Evaluate model performance')
+    rknn.eval_perf(inputs=[img], is_print=True)
+    print('done')
 
     # Release RKNN Context
     rknn.release()
