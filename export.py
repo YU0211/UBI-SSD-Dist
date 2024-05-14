@@ -1,19 +1,18 @@
-import os
 import sys
 import argparse
-import logger
 import datetime
-from tqdm import tqdm
+import time
+from pathlib import Path
+
 import torch
 from torch.utils.mobile_optimizer import optimize_for_mobile
+
 from vision.utils.logger import init_logger
 from vision.ssd.vgg_ssd import create_vgg_ssd
 from vision.ssd.mobilenetv1_ssd import create_mobilenetv1_ssd
 from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
 
-import time
-from pathlib import Path
-import numpy as np
+
 
 
 def compute_file_size(file):
@@ -180,9 +179,6 @@ if __name__ == "__main__":
     opt = parse_opt()
 
     logger = init_logger()
-    logger.Formatter.converter = GMT_8
-    logger.basicConfig(stream=sys.stdout, level=logger.INFO,
-                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger.info(
         'export: ' + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
 

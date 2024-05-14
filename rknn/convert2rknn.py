@@ -9,7 +9,7 @@ from rknn.api import RKNN
 
 PT_MODEL = '/root/ubi/UBI_SSD/models/best.torchscript.pt'
 RKNN_MODEL = 'MobilenetV2_SSD_Lite.rknn'
-IMG_PATH = '/root/ubi/UBI_SSD/rknn/car mirror_2.jpg'
+IMG_PATH = '/root/ubi/UBI_SSD/rknn/test.jpg'
 DATASET = 'dataset.txt'
 
 ORIG_IMG_SIZE = (300, 300)
@@ -117,7 +117,9 @@ if __name__ == '__main__':
                 target_platform=[target])
     print('done')
 
-    if not Path(RKNN_MODEL).exists():
+    if Path(RKNN_MODEL).exists():
+        print(f"{'!'*20}\n--> RKNN_MODEL already exists\n{'!'*20}")
+    else:
         # Load PyTorch Model
         print('--> Loading model')
         ret = rknn.load_pytorch(model=PT_MODEL, input_size_list=[

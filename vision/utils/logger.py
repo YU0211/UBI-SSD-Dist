@@ -8,9 +8,11 @@ def GMT_8(sec, what):
     return GMT_8_time.timetuple()
 
 
-def init_logger():
+def init_logger(is_GMT_8=False):
 
-    # logging.Formatter.converter = GMT_8
+    if is_GMT_8:
+        logging.Formatter.converter = GMT_8
+
     logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 

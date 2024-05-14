@@ -5,11 +5,11 @@ Object Detection with SSD on UBI Datasets.
 ### Results
 1. Detection
 
-<img src="readme_img/test_img.jpg" width="960">
+<img src="assets/test_img.jpg" width="960">
 
 2. Training log
 
-<img src="readme_img/train_log.png" width="480">
+<img src="assets/train_log.png" width="480">
 
 ### Dependencies
 - Python 3.8

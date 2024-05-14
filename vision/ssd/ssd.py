@@ -87,8 +87,11 @@ class SSD(nn.Module):
             confidences.append(confidence)
             locations.append(location)
 
+        'Bug might be here, when processing rknn.init_runtime()'
         confidences = torch.cat(confidences, 1)
         locations = torch.cat(locations, 1)
+
+
         if self.is_test:
             confidences = F.softmax(confidences, dim=2)
             boxes = box_utils.convert_locations_to_boxes(

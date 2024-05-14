@@ -1,7 +1,0 @@
-#!/bin/bash
-
-for filename in output/*.raw
-do
-    echo -e "\nDealing with $filename"
-    python3 raw2jpg.py "$filename"
-done
