@@ -22,7 +22,7 @@ class MultiboxLoss(nn.Module):
         self.priors = priors
         self.priors.to(device)
 
-    def forward(self, confidence, predicted_locations, labels, gt_locations, distances):
+    def forward(self, confidence, predicted_locations, labels, gt_locations):
         """Compute classification loss and smooth l1 loss.
 
         Args:
@@ -44,5 +44,4 @@ class MultiboxLoss(nn.Module):
         gt_locations = gt_locations[pos_mask, :].reshape(-1, 4)
         smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
         num_pos = gt_locations.size(0)
-        disances_loss = F.smooth_l1_loss(distances, gt_locations, reduction='sum')
-        return smooth_l1_loss/num_pos, classification_loss/num_pos,disances_loss/num_pos
+        return smooth_l1_loss/num_pos, classification_loss/num_pos

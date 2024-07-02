@@ -14,7 +14,8 @@ GraphPath = namedtuple("GraphPath", ['s0', 'name', 's1'])  #
 class SSD(nn.Module):
     def __init__(self, num_classes: int, base_net: nn.ModuleList, source_layer_indexes: List[int],
         extras: nn.ModuleList, classification_headers: nn.ModuleList,
-        regression_headers: nn.ModuleList, is_test=False, config=None, device=None):
+        regression_headers: nn.ModuleList,distance_headers: nn.ModuleList,
+        is_test=False, config=None, device=None,):
         """Compose a SSD model using the given components.
         """
         super(SSD, self).__init__()
@@ -25,6 +26,7 @@ class SSD(nn.Module):
         self.extras = extras
         self.classification_headers = classification_headers
         self.regression_headers = regression_headers
+        self.distance_headers = distance_headers
         self.is_test = is_test
         self.config = config
 
@@ -43,6 +45,7 @@ class SSD(nn.Module):
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         confidences = []
         locations = []
+        distances = []
         start_layer_index = 0
         header_index = 0
         for end_layer_index in self.source_layer_indexes:
@@ -72,20 +75,22 @@ class SSD(nn.Module):
                     x = layer(x)
                 end_layer_index += 1
             start_layer_index = end_layer_index
-            confidence, location = self.compute_header(header_index, y)
+            confidence, location ,distance = self.compute_header(header_index, y)
             header_index += 1
             confidences.append(confidence)
             locations.append(location)
+            distances.append(distance)
 
         for layer in self.base_net[end_layer_index:]:
             x = layer(x)
 
         for layer in self.extras:
             x = layer(x)
-            confidence, location = self.compute_header(header_index, x)
+            confidence, location ,distance = self.compute_header(header_index, x)
             header_index += 1
             confidences.append(confidence)
             locations.append(location)
+            distances.append(distance)
 
         'Bug might be here, when processing rknn.init_runtime()'
         confidences = torch.cat(confidences, 1)
@@ -111,6 +116,10 @@ class SSD(nn.Module):
         location = location.permute(0, 2, 3, 1).contiguous()
         location = location.view(location.size(0), -1, 4)
 
+        distance = self.distance_headers[i](x)
+        distance = distance.permute(0, 2, 3, 1).contiguous()
+        distance = distance.view(distance.size(0), -1, 1)
+        #以上是copilot生的
         return confidence, location
 
     def init_from_base_net(self, model):
@@ -120,6 +129,7 @@ class SSD(nn.Module):
         self.extras.apply(_kaiming_init_)
         self.classification_headers.apply(_kaiming_init_)
         self.regression_headers.apply(_kaiming_init_)
+        self.distance_headers.apply(_kaiming_init_)
 
     def init_from_pretrained_ssd(self, model):
 
@@ -131,6 +141,7 @@ class SSD(nn.Module):
         model_dict.update(state_dict)
         self.load_state_dict(model_dict)
         self.classification_headers.apply(_kaiming_init_)
+        self.distance_headers.apply(_kaiming_init_)
 
     def init(self):
         self.base_net.apply(_kaiming_init_)
@@ -138,6 +149,7 @@ class SSD(nn.Module):
         self.extras.apply(_kaiming_init_)
         self.classification_headers.apply(_kaiming_init_)
         self.regression_headers.apply(_kaiming_init_)
+        self.distance_headers.apply(_kaiming_init_)
 
     def load(self, model):
         self.load_state_dict(torch.load(
@@ -166,7 +178,9 @@ class MatchPrior(object):
         boxes = box_utils.corner_form_to_center_form(boxes)
         locations = box_utils.convert_boxes_to_locations(
             boxes, self.center_form_priors, self.center_variance, self.size_variance)
-        return locations, labels
+        distances = box_utils.convert_boxes_to_distances(
+            boxes, self.center_form_priors, self.center_variance, self.size_variance)
+        return locations, labels, distances
 
 
 def _xavier_init_(m: nn.Module):
